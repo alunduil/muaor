@@ -17,20 +17,20 @@
 require 'net/imap'
 
 module Mail
-  # TODO Find a better method of determining the account for the mailbox ...
+  # TODO Find a better method of determining the server for the mailbox ...
   class Mailbox
-    @@account_lock = Mutex.new
+    @@server_lock = Mutex.new
 
-    def initialize(name, account)
-      @account = account
-      @connection = account.send(connection)
+    def initialize(name, server)
+      @server = server
+      @connection = server.send(connection)
       @name = name
     end
 
-    private :new # Utilize Account.mailboxes to get an account's mailbox(es)
+    private :new # Utilize Server.mailboxes to get an server's mailbox(es)
 
     def delete!
-      @account.delete_mailbox(@name)
+      @server.delete_mailbox(@name)
     end
 
     def append(message)
@@ -111,12 +111,12 @@ module Mail
     ] # TODO is the right context for this list?
 
     before(*@select_methods) do 
-      @@account_lock.lock
+      @@server_lock.lock
       @connection.select(@name) 
     end # TODO Verify
 
     after(*@select_methods) do
-      @@account_lock.unlock
+      @@server_lock.unlock
     end # TODO Verify
 
     private

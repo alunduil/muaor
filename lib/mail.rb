@@ -27,7 +27,7 @@
 #
 # == Objects
 # The objects provider by MUAOR are the following:
-#   * Account
+#   * Server
 #   * Mailbox
 #   * Message
 #
@@ -41,14 +41,14 @@
 #   require 'mail'
 #   require 'mail/protocols/imap'
 #
-#   mail = Account.new("example.com", "username", "password", :MECHANISM)
+#   mail = Server.new("example.com", "username", "password", :MECHANISM)
 #
 # === Listing Mailboxes
 #
 #   require 'mail'
 #   require 'mail/protocols/imap'
 #
-#   mail = Account.new("example.com", "username", "password", :MECHANISM)
+#   mail = Server.new("example.com", "username", "password", :MECHANISM)
 #   mail.mailboxes { |mb| p mb }
 #
 # === Listing Particular Mailboxes
@@ -56,7 +56,7 @@
 #   require 'mail'
 #   require 'mail/protocols/imap'
 #
-#   mail = Account.new("example.com", "username", "password", :MECHANISM)
+#   mail = Server.new("example.com", "username", "password", :MECHANISM)
 #   mail.mailboxes "Example Folder*" "Inbox" { |mb| p mb }
 #
 # === Listing Message Properties for Particular Messages
@@ -66,14 +66,14 @@
 #   require 'mail'
 #   require 'mail/protocols/imap'
 #
-#   mail = Account.new("example.com", "username", "password", :MECHANISM)
+#   mail = Server.new("example.com", "username", "password", :MECHANISM)
 #   mail.mailboxes "INBOX" do |mb|
 #     mb.messages "header.date.>" => Date.today - 1 { |m| p m.headers.subject }
 #   end
 #
 module Mail
-  require 'mail/account'
-  #require 'mail/mailbox' TODO Add this back in after testing Account
-  #require 'mail/message' TODO Add this back in after testing Account
+  require 'mail/server'
+  #require 'mail/mailbox' TODO Add this back in after testing Server
+  #require 'mail/message' TODO Add this back in after testing Server
 end
 

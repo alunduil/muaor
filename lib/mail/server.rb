@@ -17,7 +17,7 @@
 require 'net/imap'
 
 module Mail
-  class Account # TODO Rename to server?
+  class Server # TODO Rename to server?
     def initialize(server, username, password, kwargs)
       kwargs[:method] = kwargs[:method].nil? && :login
       kwargs[:tls] = kwargs[:tls].nil? && true
