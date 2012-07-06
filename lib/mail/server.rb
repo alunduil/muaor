@@ -18,7 +18,7 @@ require 'net/imap'
 
 module Mail
   class Server # TODO Rename to server?
-    def initialize(server, username, password, kwargs)
+    def initialize(server, username, password, kwargs = {})
       kwargs[:method] = kwargs[:method].nil? && :login
       kwargs[:tls] = kwargs[:tls].nil? && true
 
@@ -39,18 +39,26 @@ module Mail
     end
 
     def login
-      @connection = Net::IMAP.new(@server)
-      @connection.starttls if @tls
+      @connection = Net::IMAP.new(@server, :ssl => @tls)
+      raise BadAuthMechanism, "Expected auth mechanism in (#{authentication_mechanisms}).  Got #{@method}." unless authentication_mechanisms.include? @method
       @connection.authenticate(@method.to_s.upcase, @username, @password)
     end
     private :login
 
     def capabilities
-      @capabilities ||= capabilities!
+      @_capabilities ||= capabilities!
     end
 
     def capabilities!
-      @capabilities = @connection.capability.each { |c| c.downcase.sub(/\s/, "_").to_sym }
+      @_capabilities = @connection.capability.each { |c| c.downcase.sub(/\s/, "_").to_sym }
+    end
+
+    def authentication_mechanisms
+      @_authentication_mechanisms ||= authentication_mechanisms!
+    end
+
+    def authentication_mechanisms!
+      @_authentication_mechanisms = capabilities.select { |c| c.match(/^auth/i) }.each { |c| c.partition("=")[-1] }
     end
 
     def mailboxes(*globs) # TODO Caching of this method sim. capabilities?
@@ -86,6 +94,8 @@ module Mail
     def connected?
       not disconnected?
     end
+
+    class BadAuthMechanismError < Net::IMAP::Error; end
   end
 end
 
