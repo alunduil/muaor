@@ -18,14 +18,15 @@ require 'net/imap'
 
 module Mail
   class Account # TODO Rename to server?
-    private_class_method :new
+    def initialize(server, username, password, kwargs)
+      kwargs[:method] = kwargs[:method].nil? && :login
+      kwargs[:tls] = kwargs[:tls].nil? && true
 
-    def initialize(server, username, password, method = :login, tls = true):
       @server = server
       @username = username
       @password = password
-      @method = method
-      @tls = tls
+      @method = kwargs[:method]
+      @tls = kwargs[:tls]
 
       login
 
@@ -40,16 +41,16 @@ module Mail
     def login
       @connection = Net::IMAP.new(@server)
       @connection.starttls if @tls
-      @connection.authenticate(@method.to_s, @username, @password)
+      @connection.authenticate(@method.to_s.upcase, @username, @password)
     end
     private :login
 
     def capabilities
-      @_capabilities ||= capabilities!
+      @capabilities ||= capabilities!
     end
 
     def capabilities!
-      @_capabilities = @connection.capability.each { |c| c.downcase.sub(/\s/, "_").to_sym }
+      @capabilities = @connection.capability.each { |c| c.downcase.sub(/\s/, "_").to_sym }
     end
 
     def mailboxes(*globs) # TODO Caching of this method sim. capabilities?
@@ -63,6 +64,15 @@ module Mail
           @connection.list(g).each { |mb| yield new_mailbox(mb) }
         end
       end
+    end
+
+    def create_mailbox!(name)
+      @connection.create(name)
+      mailboxes(name)
+    end
+
+    def delete_mailbox!(name)
+      @connection.delete(name)
     end
 
     def disconnect # TODO Alias at all?

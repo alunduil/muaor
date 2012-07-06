@@ -19,14 +19,6 @@ require 'net/imap'
 module Mail
   # TODO Find a better method of determining the account for the mailbox ...
   class Mailbox
-    def self.create(name, account)
-      account.send(connection).create(name)
-    end
-
-    def self.delete(name, account)
-      account.send(connection).delete(name)
-    end
-
     @@account_lock = Mutex.new
 
     def initialize(name, account)
@@ -35,8 +27,10 @@ module Mail
       @name = name
     end
 
+    private :new # Utilize Account.mailboxes to get an account's mailbox(es)
+
     def delete!
-      Mailbox.delete(@name, @account)
+      @account.delete_mailbox(@name)
     end
 
     def append(message)
@@ -105,7 +99,15 @@ module Mail
     end
 
     @select_methods = [
-      :append, :close
+      :append, 
+      :close, 
+      :sort,
+      :acls,
+      :check,
+      :messages,
+      :expunge,
+      :<<,
+      :append,
     ] # TODO is the right context for this list?
 
     before(*@select_methods) do 
@@ -119,11 +121,12 @@ module Mail
 
     private
 
+    # TODO Make these work ... or find an alternative.
     def self.before(*methods)
       methods.each do |method|
         define_method(method) do |*args, &block|
           yield
-          m.bind(self).(*args, &block)
+          method.bind(self)(*args, &block)
         end
       end
     end
@@ -131,7 +134,7 @@ module Mail
     def self.after(*methods)
       methods.each do |method|
         define_method(method) do |*args, &block|
-          m.bind(self).(*args, &block)
+          method.bind(self)(*args, &block)
           yield
         end
       end
