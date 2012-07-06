@@ -17,7 +17,9 @@
 require 'net/imap'
 
 module Mail
-  class Account
+  class Account # TODO Rename to server?
+    private_class_method :new
+
     def initialize(server, username, password, method = :login, tls = true):
       @server = server
       @username = username
@@ -26,9 +28,10 @@ module Mail
       @tls = tls
 
       login
-    end
 
-    private_class_method :new
+      # TODO Check for correctness ...
+      ObjectSpace.define_finalizer(self, proc { @connection.logout } )
+    end
 
     def initialize_copy(original)
       login
@@ -42,21 +45,36 @@ module Mail
     private :login
 
     def capabilities
-      @connection.capability.each { |c| c.downcase.sub(/\s/, "_").to_sym }
+      @_capabilities ||= capabilities!
     end
 
-    def mailboxes(*globs)
-      if globs.size > 0 then
-        for glob in globs do
-          if glob.index "*" or glob.index "%" then
-            @connection.list("", glob).each { |mb| yield mb }
-          else
-            @connection.list(glob).each { |mb| yield mb }
-          end
+    def capabilities!
+      @_capabilities = @connection.capability.each { |c| c.downcase.sub(/\s/, "_").to_sym }
+    end
+
+    def mailboxes(*globs) # TODO Caching of this method sim. capabilities?
+      new_mailbox = lambda { |mb| Mailbox.new(mb.name, self) }
+
+      @connection.list.each { |mb| yield new_mailbox(mb) } if globs.empty?
+      globs.each do |g|
+        if g[/[*%]/]
+          @connection.list("", g).each { |mb| yield new_mailbox(mb) }
+        else
+          @connection.list(g).each { |mb| yield new_mailbox(mb) }
         end
-      else
-        @connection.list.each { |mb| yield mb }
       end
+    end
+
+    def disconnect # TODO Alias at all?
+      @connection.disconnect
+    end
+
+    def disconnected?
+      @connection.disconnected?
+    end
+
+    def connected?
+      not disconnected?
     end
   end
 end
