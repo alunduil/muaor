@@ -16,23 +16,48 @@
 
 require 'net/imap'
 
-class Account
-  public
+module Mail
+  class Account
+    def initialize(server, username, password, method = :login, tls = true):
+      @server = server
+      @username = username
+      @password = password
+      @method = method
+      @tls = tls
 
-  def capabilities
+      login
+    end
+
+    private_class_method :new
+
+    def initialize_copy(original)
+      login
+    end
+
+    def login
+      @connection = Net::IMAP.new(@server)
+      @connection.starttls if @tls
+      @connection.authenticate(@method.to_s, @username, @password)
+    end
+    private :login
+
+    def capabilities
+      @connection.capability.each { |c| c.downcase.sub(/\s/, "_").to_sym }
+    end
+
+    def mailboxes(*globs)
+      if globs.size > 0 then
+        for glob in globs do
+          if glob.index "*" or glob.index "%" then
+            @connection.list("", glob).each { |mb| yield mb }
+          else
+            @connection.list(glob).each { |mb| yield mb }
+          end
+        end
+      else
+        @connection.list.each { |mb| yield mb }
+      end
+    end
   end
-
-  def mailboxes
-  end
-
-  def self.login user, pass, tls = true
-    return 
-  end
-
-  def self.authenticate
-  end
-
-  private new, initialize
-
 end
 

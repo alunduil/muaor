@@ -41,14 +41,14 @@
 #   require 'mail'
 #   require 'mail/protocols/imap'
 #
-#   mail = Account.authenticate("username", "password", :MECHANISM)
+#   mail = Account.new("example.com", "username", "password", :MECHANISM)
 #
 # === Listing Mailboxes
 #
 #   require 'mail'
 #   require 'mail/protocols/imap'
 #
-#   mail = Account.authenticate("username", "password", :MECHANISM)
+#   mail = Account.new("example.com", "username", "password", :MECHANISM)
 #   mail.mailboxes { |mb| p mb }
 #
 # === Listing Particular Mailboxes
@@ -56,8 +56,8 @@
 #   require 'mail'
 #   require 'mail/protocols/imap'
 #
-#   mail = Account.authenticate("username", "password", :MECHANISM)
-#   mail.mailboxes /Example Folder/.*/ { |mb| p mb }
+#   mail = Account.new("example.com", "username", "password", :MECHANISM)
+#   mail.mailboxes "Example Folder*" "Inbox" { |mb| p mb }
 #
 # === Listing Message Properties for Particular Messages
 #
@@ -66,7 +66,8 @@
 #   require 'mail'
 #   require 'mail/protocols/imap'
 #
-#   mail = Account.authenticate("username", "password", :MECHANISM)
-#   mail.mailboxes /INBOX/ do |mb|
+#   mail = Account.new("example.com", "username", "password", :MECHANISM)
+#   mail.mailboxes "INBOX" do |mb|
 #     mb.messages "header.date.>" => Date.today - 1 { |m| p m.headers.subject }
+#   end
 #
