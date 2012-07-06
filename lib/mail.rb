@@ -71,3 +71,9 @@
 #     mb.messages "header.date.>" => Date.today - 1 { |m| p m.headers.subject }
 #   end
 #
+module Mail
+  require 'mail/account'
+  require 'mail/mailbox'
+  require 'mail/message'
+end
+
