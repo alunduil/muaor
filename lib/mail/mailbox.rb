@@ -27,7 +27,7 @@ module Mail
     end
 
     def locks(connection)
-      @mutexes[connection] = Mutex.new unless @mutexes.included? connection
+      @mutexes[connection] = Mutex.new unless @mutexes.has_key? connection
       @mutexes[connection]
     end
 
@@ -39,10 +39,12 @@ module Mail
 
     def initialize(name, server)
       @server = server
-      @connection = server.send(connection)
+      @connection = server.send(:connection)
       @lock = MailboxLock.instance[@connection]
       @name = name
     end
+
+    attr_reader :name
 
     def delete! # TODO Drop the !?
       @server.delete_mailbox(@name)

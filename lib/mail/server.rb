@@ -57,6 +57,7 @@ module Mail
 
       # TODO Check for correctness ...
       ObjectSpace.define_finalizer(self, proc { @connection.logout } )
+      nil
     end
 
     #
@@ -144,14 +145,10 @@ module Mail
     # mailboxes [Mail::Mailbox].
     #
     def mailboxes(*globs) # TODO Caching of this method sim. capabilities?
-      if block_given?
-        @connection.list("", "*").each { |mb| yield Mailbox.new(mb.name, self) } if globs.empty?
-        globs.each { |g| @connection.list("", g).each { |mb| yield Mailbox.new(mb.name, self) } }
-      else
-        mbs = []
-        mailboxes(*globs) { |mb| mbs << mb }
-        mbs
-      end
+      return [].inject { |mbs, mb| mailboxes(*globs) { |imb| mbs << mb } } if not block_given?
+      @connection.list("", "*").each { |mb| yield Mailbox.new(mb.name, self) } if globs.empty?
+      globs.each { |g| @connection.list("", g).each { |mb| yield Mailbox.new(mb.name, self) } }
+      nil
     end
 
     # 
@@ -209,6 +206,9 @@ module Mail
     def connected?
       not disconnected?
     end
+
+    attr_reader :connection
+    private :connection
 
   end
 
