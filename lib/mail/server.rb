@@ -59,10 +59,30 @@ module Mail
       ObjectSpace.define_finalizer(self, proc { @connection.logout } )
     end
 
+    #
+    # === Synopsis
+    #   
+    #   Mail::Server.dup
+    #
+    # === Description
+    #
+    # Duplicates the server object and ensures that a new connection comes with
+    # the cloned instance.  Multi-connection situations can thus be created
+    # with the following idea:
+    #
+    #   a = Mail::Server.new(host, username, password)
+    #   b = a.dup
+    #
+    # All operations on a and b will be rectified by the server as part of the 
+    # underlying mail implementation.  
+    #
     def initialize_copy(original)
       login
     end
 
+    #
+    # Log into the mail server specified during instantiation.
+    #
     def login
       @connection = Net::IMAP.new(@host, :ssl => @tls)
       raise BadAuthMechanismError, "Expected auth mechanism in (#{authentication_mechanisms}).  Got #{@method}." unless authentication_mechanisms.include? @method
@@ -70,28 +90,77 @@ module Mail
     end
     private :login
 
+    #
+    # A list of symbols that correspond to the server's capabilities.  These
+    # values will be cached in memory.  To bypass caching use
+    # Mail::Server#capabilities!
+    #
     def capabilities
       @_capabilities ||= capabilities!
     end
 
+    #
+    # See Mail::Server#capabilities
+    #
     def capabilities!
       @_capabilities = @connection.capability.map { |c| c.downcase.sub(/\s/, "_").to_sym }
     end
 
+    #
+    # A list of symbols that correspond to the server's auth mechanisms.  These
+    # values will be cached in memory.  To bypass caching use
+    # Mail::Server#authentication_mechanisms!
+    #
     def authentication_mechanisms
       @_authentication_mechanisms ||= authentication_mechanisms!
     end
 
+    # 
+    # See Mail::Server#authentication_mechanisms
+    #
     def authentication_mechanisms!
       @_authentication_mechanisms = capabilities.select { |c| c.match(/^auth/i) }.map { |c| c.to_s.split("=")[-1].to_sym }
     end
 
-    # TODO Make this not require any parameters
+    # 
+    # === Synopsis
+    #
+    #   Mail::Server#mailboxes([globs, ...]) [ { |mailbox| ... } ]
+    #
+    # === Arguments
+    # +globs+::
+    #   List of globs (String) that specify mailboxes on the server.  These
+    #   globs understand the '%' and '*' globs.  The '*' matches zero or more
+    #   characters, including the server's mailbox delimiter and the '%'
+    #   matches zero or more characters, _not_ including the server's mailbox
+    #   delimiter.  Zero or more globs can be passed to filter out mailboxes
+    #   of interest.
+    #
+    # === Description
+    #
+    # Return the matched mailboxes for the globs passed (if no globs are passed
+    # this returns all mailboxes.  Can be passed a block to perform an action
+    # on the selected mailboxes but if no block is given returns an array of 
+    # mailboxes [Mail::Mailbox].
+    #
     def mailboxes(*globs) # TODO Caching of this method sim. capabilities?
       @connection.list("", "*").each { |mb| yield Mailbox.new(mb.name, self) } if globs.empty?
       globs.each { |g| @connection.list("", g).each { |mb| yield Mailbox.new(mb.name, self) } }
     end
 
+    # 
+    # === Synopsis
+    #
+    #   Mail::Server#create_mailbox(name)
+    #
+    # === Arguments
+    # +name+::
+    #   Name of the mailbox to be created (String)
+    #
+    # === Description
+    #
+    # Crates a new mailbox on the serve with the given +name+.
+    #
     def create_mailbox!(name)
       @connection.create(name)
       mailboxes(name)

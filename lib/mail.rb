@@ -27,9 +27,9 @@
 #
 # == Objects
 # The objects provider by MUAOR are the following:
-#   * Server
-#   * Mailbox
-#   * Message
+# * Server
+# * Mailbox
+# * Message
 #
 # These resource looking objects map directly to the upstream mail
 # implementation commands and allow interesting interactions like those shown
