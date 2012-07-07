@@ -18,11 +18,36 @@ require 'net/imap'
 
 module Mail
   class Server
-    def initialize(server, username, password, kwargs = {})
+    #
+    # === Synopsis
+    #
+    #   Mail::Server.new(host, username, password, kwargs)
+    #
+    # === Arguments
+    #
+    # +host+::
+    #   Hostname to connect to (String)
+    # +username+::
+    #   Username to connect with (String)
+    # +password+::
+    #   Password to connect with (String)
+    # +kwargs+::
+    #   Other optional arguments.  Meaningful values are:
+    # * :method::
+    #   The authentication method to sign in with.  Default :login
+    # * :tls::
+    #   Use TLS or SSL? Default true
+    #
+    # === Description
+    #
+    # Connect to the mail (IMAP) service at +host+ authenticating with
+    # +username+ and +password+.
+    #
+    def initialize(host, username, password, kwargs = {})
       kwargs[:method] = :login if not kwargs.include? :method
       kwargs[:tls] = true if not kwargs.include? :tls
 
-      @server = server
+      @host = host
       @username = username
       @password = password
       @method = kwargs[:method]
@@ -39,7 +64,7 @@ module Mail
     end
 
     def login
-      @connection = Net::IMAP.new(@server, :ssl => @tls)
+      @connection = Net::IMAP.new(@host, :ssl => @tls)
       raise BadAuthMechanismError, "Expected auth mechanism in (#{authentication_mechanisms}).  Got #{@method}." unless authentication_mechanisms.include? @method
       @connection.authenticate(@method.to_s.upcase, @username, @password)
     end
@@ -88,7 +113,8 @@ module Mail
       not disconnected?
     end
 
-    class BadAuthMechanismError < Net::IMAP::Error; end
   end
+
+  class BadAuthMechanismError < Net::IMAP::Error; end
 end
 

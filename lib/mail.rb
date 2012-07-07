@@ -73,7 +73,7 @@
 #
 module Mail
   require 'mail/server'
-  #require 'mail/mailbox' TODO Add this back in after testing Server
+  require 'mail/mailbox'
   #require 'mail/message' TODO Add this back in after testing Server
 end
 
