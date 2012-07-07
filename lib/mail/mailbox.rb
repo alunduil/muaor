@@ -46,6 +46,8 @@ module Mail
 
     attr_reader :name
 
+    alias to_s name
+
     def delete! # TODO Drop the !?
       @server.delete_mailbox(@name)
     end

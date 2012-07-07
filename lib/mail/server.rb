@@ -170,7 +170,7 @@ module Mail
     #
     def create_mailbox!(name)
       @connection.create(name)
-      mailboxes(name)
+      mailboxes(name) { |mb| return mb }
     end
 
     # 
@@ -188,6 +188,7 @@ module Mail
     #
     def delete_mailbox!(name)
       @connection.delete(name)
+      nil
     end
 
     #
