@@ -151,6 +151,7 @@ module Mail
         mbs = []
         mailboxes(*globs) { |mb| mbs << mb }
         mbs
+      end
     end
 
     # 
