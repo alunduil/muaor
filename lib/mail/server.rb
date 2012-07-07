@@ -60,6 +60,10 @@ module Mail
       nil
     end
 
+    def to_s
+      "imap#{@tls ? "s" : ""}://#{@username}@#{@host}"
+    end
+
     #
     # === Synopsis
     #   
