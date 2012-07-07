@@ -150,8 +150,8 @@ module Mail
     #
     def mailboxes(*globs) # TODO Caching of this method sim. capabilities?
       return [].inject { |mbs, mb| mailboxes(*globs) { |imb| mbs << mb } } if not block_given?
-      @connection.list("", "*").each { |mb| yield Mailbox.new(mb.name, self) } if globs.empty?
-      globs.each { |g| @connection.list("", g).each { |mb| yield Mailbox.new(mb.name, self) } }
+      @connection.list("", "*").each { |mb| yield Mailbox.send(:new, mb.name, self) } if globs.empty?
+      globs.each { |g| @connection.list("", g).each { |mb| yield Mailbox.send(:new, mb.name, self) } }
       nil
     end
 
