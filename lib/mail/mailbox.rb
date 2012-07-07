@@ -15,21 +15,36 @@
 # Place - Suite 330, Boston, MA  02111-1307, USA.
 
 require 'net/imap'
+require 'singleton'
+require 'aquarium'
 
 module Mail
-  # TODO Find a better method of determining the server for the mailbox ...
+  class MailboxLock
+    include Singleton
+
+    def initialize
+      @mutexes = {}
+    end
+
+    def locks(connection)
+      @mutexes[connection] = Mutex.new unless @mutexes.included? connection
+      @mutexes[connection]
+    end
+
+    alias [] locks
+  end
+
   class Mailbox
-    @@server_lock = Mutex.new
+    include Aquarium::DSL
 
     def initialize(name, server)
       @server = server
       @connection = server.send(connection)
+      @lock = MailboxLock.instance[@connection]
       @name = name
     end
 
-    private :new # Utilize Server.mailboxes to get an server's mailbox(es)
-
-    def delete!
+    def delete! # TODO Drop the !?
       @server.delete_mailbox(@name)
     end
 
@@ -58,6 +73,8 @@ module Mail
       @connection.search(filters).each { |msn| new_message(msn) }
     end
 
+    alias search messages
+
     def quota
       @connection.getquotaroot(@name) # TODO Check the return of this call.
     end
@@ -67,8 +84,6 @@ module Mail
       @name = name
       # TODO Check for subscription change?
     end
-
-    alias search messages
 
     def subscribe
       @connection.subscribe(@name)
@@ -90,54 +105,19 @@ module Mail
       @connection.getacl(@name) # TODO Check the return of this call.
     end
 
-    def sort!(sort_by, filter_by = :all)
-      new_message = lambda { |msn| Message.new(msn, self) }
-      @connection.sort(sort_by, filter_by, "UTF-8").each { |msn| new_message(msn) }
+    def sort(sort_by, filter_by = :all)
+      @connection.sort(sort_by, filter_by, "UTF-8").each { |msn| yield Message.new(msn, self) }
     end
 
     def count(property)
     end
 
-    @select_methods = [
-      :append, 
-      :close, 
-      :sort,
-      :acls,
-      :check,
-      :messages,
-      :expunge,
-      :<<,
-      :append,
-    ] # TODO is the right context for this list?
-
-    before(*@select_methods) do 
-      @@server_lock.lock
-      @connection.select(@name) 
-    end # TODO Verify
-
-    after(*@select_methods) do
-      @@server_lock.unlock
-    end # TODO Verify
-
-    private
-
-    # TODO Make these work ... or find an alternative.
-    def self.before(*methods)
-      methods.each do |method|
-        define_method(method) do |*args, &block|
-          yield
-          method.bind(self)(*args, &block)
-        end
-      end
-    end
-
-    def self.after(*methods)
-      methods.each do |method|
-        define_method(method) do |*args, &block|
-          method.bind(self)(*args, &block)
-          yield
-        end
-      end
+    around :calls_to => [:sort, :check, :save, :search, :messages, :expunge, :close] do |jp, obj, *args|
+      @lock.lock
+      @connection.select(@name)
+      result = join_point.proceed
+      @lock.unlock
+      result
     end
   end
 end
