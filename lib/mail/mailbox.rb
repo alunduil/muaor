@@ -75,11 +75,13 @@ module Mail
       @name = name
     end
 
-    private :new
+    private_class_method :new
 
     attr_reader :name
 
-    alias to_s name
+    def to_s
+      @name
+    end
 
     #
     # Delete the Mailbox on the server.
@@ -224,6 +226,25 @@ module Mail
       @connection.sort(sort_by, filter_by, "UTF-8").each { |msn| yield Message.new(msn, self) }
     end
 
+    #
+    # === Synopsis
+    #
+    #   Mail::Mailbox#count(property)
+    #
+    # === Arguments
+    # +property+::
+    #   Property to count (Symbol)
+    #
+    #   Can be one of the following: :messages, :recent, :unseen:
+    #
+    # * :messages - Count of all messages in Mailbox
+    # * :recent - Count of recent messages in Mailbox
+    # * :unseen - Count of unseen (unread) messages in Mailbox
+    #
+    # === Description
+    #
+    # Provides various counts of messages in the Mailbox in various states.
+    #
     def count(property)
       key = property.to_s.upcase
       @connection.status(@name, [key])[key].to_int
