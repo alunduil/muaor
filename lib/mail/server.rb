@@ -144,8 +144,13 @@ module Mail
     # mailboxes [Mail::Mailbox].
     #
     def mailboxes(*globs) # TODO Caching of this method sim. capabilities?
-      @connection.list("", "*").each { |mb| yield Mailbox.new(mb.name, self) } if globs.empty?
-      globs.each { |g| @connection.list("", g).each { |mb| yield Mailbox.new(mb.name, self) } }
+      if block_given?
+        @connection.list("", "*").each { |mb| yield Mailbox.new(mb.name, self) } if globs.empty?
+        globs.each { |g| @connection.list("", g).each { |mb| yield Mailbox.new(mb.name, self) } }
+      else
+        mbs = []
+        mailboxes(*globs) { |mb| mbs << mb }
+        mbs
     end
 
     # 
@@ -159,31 +164,71 @@ module Mail
     #
     # === Description
     #
-    # Crates a new mailbox on the serve with the given +name+.
+    # Crates a new mailbox on the server with the given +name+.
     #
     def create_mailbox!(name)
       @connection.create(name)
       mailboxes(name)
     end
 
+    # 
+    # === Synopsis
+    #
+    #   Mail::Server#delete_mailbox(name)
+    #
+    # === Arguments
+    # +name+::
+    #   Name of the mailbox to be deleted (String)
+    #
+    # === Description
+    #
+    # Deletes the mailbox with +name+ on the server.
+    #
     def delete_mailbox!(name)
       @connection.delete(name)
     end
 
+    #
+    # Disconnect from the server.
+    #
     def disconnect # TODO Alias at all?
       @connection.disconnect
     end
 
+    #
+    # Check if the Server is disconnected from the mail server.
+    #
     def disconnected?
       @connection.disconnected?
     end
 
+    #
+    # Check if the Server is connected to the mail server.
+    #
     def connected?
       not disconnected?
     end
 
   end
 
+  #
+  # Error raised when the authentication mechanism requested is not supported
+  # by the remote mail server.
+  #
+  # For example, when connecting to a server without the :plain
+  # authentication mechanism:
+  #
+  #   Mail::Account#authentication_mechanism.include? :plain #=> false
+  #
+  # We would raise this error to explain that the mechanism can't be used if
+  # requested:
+  #
+  #   Mail::Account.new(host, username, password, :method => :plain)
+  #
+  # raises the exception:
+  #
+  #   Mail::Server::BadAuthMechanismError: Expected auth mechanism in ([:ntlm, :gssapi, :login]).  Got plain.
+  #
   class BadAuthMechanismError < Net::IMAP::Error; end
 end
 
