@@ -77,3 +77,19 @@ module Mail
   #require 'mail/message' TODO Add this back in after testing Server
 end
 
+# Hack stolen from http://www.semicomplete.com/blog/tags/imap to counteract the
+# idiocracy which is exchange.
+
+# TODO Move this to the exchange driver (or exchange IMAP hacks).
+module Net
+  class IMAP
+    class ResponseParser
+      def continue_req
+        match(T_PLUS)
+        #match(T_SPACE)
+        return ContinuationRequest.new(resp_text, @str)
+      end
+    end
+  end
+end
+

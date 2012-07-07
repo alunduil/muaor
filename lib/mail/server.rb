@@ -17,10 +17,10 @@
 require 'net/imap'
 
 module Mail
-  class Server # TODO Rename to server?
+  class Server
     def initialize(server, username, password, kwargs = {})
-      kwargs[:method] = kwargs[:method].nil? && :login
-      kwargs[:tls] = kwargs[:tls].nil? && true
+      kwargs[:method] = :login if not kwargs.include? :method
+      kwargs[:tls] = true if not kwargs.include? :tls
 
       @server = server
       @username = username
@@ -40,7 +40,7 @@ module Mail
 
     def login
       @connection = Net::IMAP.new(@server, :ssl => @tls)
-      raise BadAuthMechanism, "Expected auth mechanism in (#{authentication_mechanisms}).  Got #{@method}." unless authentication_mechanisms.include? @method
+      raise BadAuthMechanismError, "Expected auth mechanism in (#{authentication_mechanisms}).  Got #{@method}." unless authentication_mechanisms.include? @method
       @connection.authenticate(@method.to_s.upcase, @username, @password)
     end
     private :login
@@ -50,7 +50,7 @@ module Mail
     end
 
     def capabilities!
-      @_capabilities = @connection.capability.each { |c| c.downcase.sub(/\s/, "_").to_sym }
+      @_capabilities = @connection.capability.map { |c| c.downcase.sub(/\s/, "_").to_sym }
     end
 
     def authentication_mechanisms
@@ -58,20 +58,25 @@ module Mail
     end
 
     def authentication_mechanisms!
-      @_authentication_mechanisms = capabilities.select { |c| c.match(/^auth/i) }.each { |c| c.partition("=")[-1] }
+      @_authentication_mechanisms = capabilities.select { |c| c.match(/^auth/i) }.map { |c| c.to_s.split("=")[-1].to_sym }
     end
 
+    # TODO Make this not require any parameters
     def mailboxes(*globs) # TODO Caching of this method sim. capabilities?
       new_mailbox = lambda { |mb| Mailbox.new(mb.name, self) }
 
-      @connection.list.each { |mb| yield new_mailbox(mb) } if globs.empty?
+      mailboxes = [] if not block_given?
+
+      @connection.list.each { |mb| block_given? ? yield new_mailbox mb : mailboxes << new_mailbox mb } if globs.empty?
       globs.each do |g|
         if g[/[*%]/]
-          @connection.list("", g).each { |mb| yield new_mailbox(mb) }
+          @connection.list("", g).each { |mb| block_given? ? yield new_mailbox mb : mailboxes << new_mailbox mb }
         else
-          @connection.list(g).each { |mb| yield new_mailbox(mb) }
+          @connection.list(g).each { |mb| block_given? ? yield new_mailbox mb : mailboxes << new_mailbox mb }
         end
       end
+
+      return mailboxes if block_given?
     end
 
     def create_mailbox!(name)
