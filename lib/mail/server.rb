@@ -63,20 +63,8 @@ module Mail
 
     # TODO Make this not require any parameters
     def mailboxes(*globs) # TODO Caching of this method sim. capabilities?
-      new_mailbox = lambda { |mb| Mailbox.new(mb.name, self) }
-
-      mailboxes = [] if not block_given?
-
-      @connection.list.each { |mb| block_given? ? yield new_mailbox mb : mailboxes << new_mailbox mb } if globs.empty?
-      globs.each do |g|
-        if g[/[*%]/]
-          @connection.list("", g).each { |mb| block_given? ? yield new_mailbox mb : mailboxes << new_mailbox mb }
-        else
-          @connection.list(g).each { |mb| block_given? ? yield new_mailbox mb : mailboxes << new_mailbox mb }
-        end
-      end
-
-      return mailboxes if block_given?
+      @connection.list("", "*").each { |mb| yield Mailbox.new(mb.name, self) } if globs.empty?
+      globs.each { |g| @connection.list("", g).each { |mb| yield Mailbox.new(mb.name, self) } }
     end
 
     def create_mailbox!(name)
