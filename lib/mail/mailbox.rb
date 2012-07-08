@@ -164,12 +164,12 @@ module Mail
     # on the messages.  If no block is passed the list of messages is returned.
     #
     def messages(*filters)
-      new_message = lambda { |msn| Message.new(msn, self) } # msn -> msg seq num
+      msgs = []
+      @connection.search.each { |msn| msgs << Message.new(msn, self) } if filters.empty?
 
-      return @connection.search.each { |msn| new_message(msn) } if filters.empty?
+      # TODO Add special filter translations here ...
 
-      # TODO Add special filter processing here ...
-      @connection.search(filters).each { |msn| new_message(msn) }
+      msgs
     end
 
     alias search messages
@@ -178,6 +178,7 @@ module Mail
     # The Mailbox's quota.
     #
     def quota
+      return nil if @server.capabilities.select { |c| c.match(/^quota=/i) }.empty?
       @connection.getquotaroot(@name) # TODO Check the return of this call.
     end
 
@@ -219,6 +220,7 @@ module Mail
     # Get the current ACL of the Mailbox.
     #
     def acls
+      return nil unless @server.capabilities.include? :acl
       @connection.getacl(@name) # TODO Check the return of this call.
     end
 
@@ -251,12 +253,25 @@ module Mail
     end
 
     around :calls_to => [:sort, :check, :save, :search, :messages, :expunge, :close, :count] do |jp, obj, *args|
-      @lock.lock
-      @connection.select(@name)
-      result = join_point.proceed
-      @lock.unlock
+      obj.send(:before)
+      result = jp.proceed
+      obj.send(:after)
       result
     end
+
+    private
+
+    def before
+      lambda do
+        @lock.lock
+        @connection.select(@name)
+      end
+    end
+
+    def after
+      lambda { @lock.unlock }
+    end
+
   end
 end
 

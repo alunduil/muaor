@@ -74,7 +74,7 @@
 module Mail
   require 'mail/server'
   require 'mail/mailbox'
-  require 'mail/message' TODO Add this back in after testing Server
+  require 'mail/message'
 end
 
 # Hack stolen from http://www.semicomplete.com/blog/tags/imap to counteract the
@@ -88,6 +88,22 @@ module Net
         match(T_PLUS)
         #match(T_SPACE)
         return ContinuationRequest.new(resp_text, @str)
+      end
+
+      def response
+        token = lookahead
+        case token.symbol
+        when T_PLUS
+          result = continue_req
+        when T_STAR
+          result = response_untagged
+        else
+          result = response_tagged
+        end
+        shift_token if lookahead.symbol == T_SPACE
+        match(T_CRLF)
+        match(T_EOF)
+        return result
       end
     end
   end

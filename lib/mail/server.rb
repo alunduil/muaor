@@ -104,12 +104,16 @@ module Mail
       @_capabilities ||= capabilities!
     end
 
+    alias caps capabilities
+
     #
     # See Mail::Server#capabilities
     #
     def capabilities!
       @_capabilities = @connection.capability.map { |c| c.downcase.sub(/\s/, "_").to_sym }
     end
+
+    alias caps! capabilities!
 
     #
     # A list of symbols that correspond to the server's auth mechanisms.  These
@@ -120,12 +124,16 @@ module Mail
       @_authentication_mechanisms ||= authentication_mechanisms!
     end
 
+    alias auth_mechs authentication_mechanisms
+
     # 
     # See Mail::Server#authentication_mechanisms
     #
     def authentication_mechanisms!
-      @_authentication_mechanisms = capabilities.select { |c| c.match(/^auth/i) }.map { |c| c.to_s.split("=")[-1].to_sym }
+      @_authentication_mechanisms = capabilities!.select { |c| c.match(/^auth/i) }.map { |c| c.to_s.split("=").last.to_sym }
     end
+
+    alias auth_mechs! authentication_mechanisms!
 
     # 
     # === Synopsis
@@ -144,15 +152,14 @@ module Mail
     # === Description
     #
     # Return the matched mailboxes for the globs passed (if no globs are passed
-    # this returns all mailboxes.  Can be passed a block to perform an action
-    # on the selected mailboxes but if no block is given returns an array of 
-    # mailboxes [Mail::Mailbox].
+    # this returns all mailboxes.  Returns an array of mailboxes 
+    # [Mail::Mailbox].
     #
     def mailboxes(*globs) # TODO Caching of this method sim. capabilities?
-      return [].inject { |mbs, mb| mailboxes(*globs) { |imb| mbs << mb } } if not block_given?
-      @connection.list("", "*").each { |mb| yield Mailbox.send(:new, mb.name, self) } if globs.empty?
-      globs.each { |g| @connection.list("", g).each { |mb| yield Mailbox.send(:new, mb.name, self) } }
-      nil
+      mbs = []
+      @connection.list("", "*").each { |mb| mbs << Mailbox.send(:new, mb.name, self) } if globs.empty?
+      globs.each { |g| @connection.list("", g).each { | mb| mbs << Mailbox.send(:new, mb.name, self) } }
+      mbs
     end
 
     # 
