@@ -184,11 +184,11 @@ module Mail
     #
     # === Description
     #
-    # Deletes the mailbox with +name+ on the server.
+    # Deletes the mailbox with +name+ on the server.  
     #
     def delete_mailbox!(name)
       @connection.delete(name)
-      nil
+      true
     end
 
     #

@@ -74,7 +74,7 @@
 module Mail
   require 'mail/server'
   require 'mail/mailbox'
-  #require 'mail/message' TODO Add this back in after testing Server
+  require 'mail/message' TODO Add this back in after testing Server
 end
 
 # Hack stolen from http://www.semicomplete.com/blog/tags/imap to counteract the
