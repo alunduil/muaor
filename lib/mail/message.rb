@@ -36,24 +36,29 @@ module Mail
       @_uid ||= uid!
     end
 
+    def uid! # Just in case ...
+      @_uid = @connection.uid_fetch(@_uid, "UID").first.attr["UID"]
+    end
+
     def uid=(value)
       @_uid = value
     end
     private :uid=
 
-    def uid! # Just in case ...
-      @_uid = @connection.uid_fetch(@_uid, "UID").first.attr["UID"]
+    def headers(*headers)
+      @_headers ||= {}
+      headers!(*headers) unless Set.new(headers).subset? @_headers.keys
+      @_headers.select { |k,v| headers.include? k }
     end
 
-    def headers(header) # TODO Multiple headers at a time.
+    def headers!(*headers)
       @_headers ||= {}
-      @_headers[header] ||= headers!(header)
+      keys = Hash.new { |h, k| h[k] = "BODY[HEADER.FIELDS (#{k.to_s.upcase})]" }
+      headers.each do |h| 
+        @_headers.merge!(h => @connection.uid_fetch(uid!, keys[h]).first.attr[keys[h]])
+      end
+      @headers.select { |k,v| headers.include? k }
     end
-
-    def headers!(header)
-      @_headers ||= {}
-      key = "BODY[HEADER.FIELDS (#{property.to_s.upcase}]"
-      @_headers[header] ||= @connection.uid_fetch(uid!, key).first.attr[key]
   end
 end
 
