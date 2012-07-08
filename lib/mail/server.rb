@@ -155,6 +155,8 @@ module Mail
     # this returns all mailboxes.  Returns an array of mailboxes 
     # [Mail::Mailbox].
     #
+    # TODO Add an option to search only subscribed mailboxes.
+    #
     def mailboxes(*globs) # TODO Caching of this method sim. capabilities?
       mbs = []
       @connection.list("", "*").each { |mb| mbs << Mailbox.send(:new, mb.name, self) } if globs.empty?

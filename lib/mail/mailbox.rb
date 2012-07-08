@@ -19,34 +19,6 @@ require 'singleton'
 require 'aquarium'
 
 module Mail
-  class MailboxLock
-    include Singleton
-
-    def initialize
-      @mutexes = {}
-    end
-
-    #
-    # === Synopsis
-    #
-    #   Mail::MailboxLock#locks(connection)
-    #
-    # === Arguments
-    # +connection+::
-    #   The connection that we're using is the key for the lock (Net::IMAP)
-    #
-    # === Description
-    #
-    # Get the particular mutex for the connection being used by the mailbox.
-    #
-    def locks(connection)
-      @mutexes[connection] = Mutex.new unless @mutexes.has_key? connection
-      @mutexes[connection]
-    end
-
-    alias [] locks
-  end
-
   class Mailbox
     include Aquarium::DSL
 
@@ -70,7 +42,7 @@ module Mail
     #
     def initialize(name, server)
       @server = server
-      @connection = server.send(:connection)
+      @connection = @server.send(:connection)
       @lock = MailboxLock.instance[@connection]
       @name = name
     end
@@ -165,9 +137,10 @@ module Mail
     #
     def messages(*filters)
       msgs = []
-      @connection.search.each { |msn| msgs << Message.new(msn, self) } if filters.empty?
+      (1..unlocked_count(:messages)).each { |msn| msgs << Message.send(:new, msn, self) } if filters.empty?
 
       # TODO Add special filter translations here ...
+      #@connection.search([]).each { |msn| msgs << Message.new(msn, self) } if filters.empty?
 
       msgs
     end
@@ -248,8 +221,7 @@ module Mail
     # Provides various counts of messages in the Mailbox in various states.
     #
     def count(property)
-      key = property.to_s.upcase
-      @connection.status(@name, [key])[key].to_int
+      unlocked_count(property)
     end
 
     around :calls_to => [:sort, :check, :save, :search, :messages, :expunge, :close, :count] do |jp, obj, *args|
@@ -261,17 +233,53 @@ module Mail
 
     private
 
+    attr_reader :connection
+
+    def unlocked_count(property)
+      key = property.to_s.upcase
+      @connection.status(@name, [key])[key].to_int
+    end
+
     def before
-      lambda do
-        @lock.lock
-        @connection.select(@name)
-      end
+      @lock.lock
+      @connection.select(@name)
     end
 
     def after
-      lambda { @lock.unlock }
+      @lock.unlock
     end
 
   end
+
+  private
+
+  class MailboxLock
+    include Singleton
+
+    def initialize
+      @mutexes = {}
+    end
+
+    #
+    # === Synopsis
+    #
+    #   Mail::MailboxLock#locks(connection)
+    #
+    # === Arguments
+    # +connection+::
+    #   The connection that we're using is the key for the lock (Net::IMAP)
+    #
+    # === Description
+    #
+    # Get the particular mutex for the connection being used by the mailbox.
+    #
+    def locks(connection)
+      @mutexes[connection] = Mutex.new unless @mutexes.has_key? connection
+      @mutexes[connection]
+    end
+
+    alias [] locks
+  end
+
 end
 

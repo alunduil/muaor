@@ -17,5 +17,43 @@
 require 'net/imap'
 
 module Mail
+  class Message
+    def initialize(msn, mailbox, *kwargs)
+      @mailbox = mailbox
+      @connection = @mailbox.send(:connection)
+      @lock = MailboxLock.instance[@connection]
+
+      uid = kwargs.include? :uid && kwargs.delete(:uid) || @connection.fetch(msn, "UID").first.attr["UID"]
+    end
+
+    private_class_method :new
+
+    def to_s
+      "#{uid} # #{headers(:from)} -> #{headers(:to)} :: #{headers(:subject)}"
+    end
+
+    def uid
+      @_uid ||= uid!
+    end
+
+    def uid=(value)
+      @_uid = value
+    end
+    private :uid=
+
+    def uid! # Just in case ...
+      @_uid = @connection.uid_fetch(@_uid, "UID").first.attr["UID"]
+    end
+
+    def headers(header) # TODO Multiple headers at a time.
+      @_headers ||= {}
+      @_headers[header] ||= headers!(header)
+    end
+
+    def headers!(header)
+      @_headers ||= {}
+      key = "BODY[HEADER.FIELDS (#{property.to_s.upcase}]"
+      @_headers[header] ||= @connection.uid_fetch(uid!, key).first.attr[key]
+  end
 end
 
