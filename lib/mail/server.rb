@@ -44,7 +44,7 @@ module Mail
     # +username+ and +password+.
     #
     def initialize(host, username, password, kwargs = {})
-      kwargs[:method] = :login if not kwargs.include? :method
+      kwargs[:method] = :plain if not kwargs.include? :method
       kwargs[:tls] = true if not kwargs.include? :tls
 
       @host = host
