@@ -137,7 +137,21 @@ module Mail
     #
     def messages(*filters)
       msgs = []
-      (1..unlocked_count(:messages)).each { |msn| msgs << Message.send(:new, msn, self) } if filters.empty?
+      if filters.empty? # Get the basics about all messages ...
+        @connection.fetch(1..unlocked_count(:messages), [
+                          "UID",
+                          "BODY[HEADER.FIELDS (SUBJECT)]",
+                          "BODY[HEADER.FIELDS (TO)]",
+                          "BODY[HEADER.FIELDS (FROM)]"
+        ]).each do |f|
+          msgs << Message.send(:new, f.seqno, self,
+                               :uid => f.attr["UID"],
+                               "headers.subject" => f.attr["BODY[HEADER.FIELDS (SUBJECT)]"],
+                               "headers.to" => f.attr["BODY[HEADER.FIELDS (TO)]"],
+                               "headers.from" => f.attr["BODY[HEADER.FIELDS (FROM)]"]
+                              )
+        end
+      end
 
       # TODO Add special filter translations here ...
       #@connection.search([]).each { |msn| msgs << Message.new(msn, self) } if filters.empty?
