@@ -155,7 +155,7 @@ module Mail
       return @mailboxes["*"] ||= mailboxes! if globs.empty?
 
       unknown_globs = globs.to_set - @mailboxes.keys.to_set
-      mailboxes!(*globs) unless unknown_globs.empty?
+      mailboxes!(*unknown_globs) unless unknown_globs.empty?
 
       return @mailboxes[globs.first] if globs.length == 1
       @mailboxes.select { |k,v| globs.include? k }.map { |k,v| v }.flatten
