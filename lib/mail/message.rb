@@ -51,6 +51,7 @@ module Mail
     end
 
     def headers(*headers)
+      raise ArgumentError, "wrong number of arguments (0 for 1 or more)" if headers.empty?
       @_headers ||= {}
       headers!(*headers) unless Set.new(headers).subset? Set.new(@_headers.keys)
       return @_headers[headers.first] if headers.length == 1
@@ -58,13 +59,14 @@ module Mail
     end
 
     def headers!(*headers)
+      raise ArgumentError, "wrong number of arguments (0 for 1 or more)" if headers.empty?
       @_headers ||= {}
       keys = Hash.new { |h, k| h[k] = "BODY[HEADER.FIELDS (#{k.to_s.upcase})]" }
       headers.each do |h| 
         @_headers.merge!(h => @connection.uid_fetch(uid!, keys[h]).first.attr[keys[h]].split(':', 2).last.strip)
       end
       return @_headers[headers.first] if headers.length == 1
-      @headers.select { |k,v| headers.include? k }
+      @_headers.select { |k,v| headers.include? k }
     end
   end
 end

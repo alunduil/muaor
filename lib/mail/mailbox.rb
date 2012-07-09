@@ -136,7 +136,17 @@ module Mail
     # on the messages.  If no block is passed the list of messages is returned.
     #
     def messages(*filters)
-      msgs = []
+      @_messages ||= {}
+      key = filters.join
+      messages!(*filters) unless @_messages.include? key
+      @_messages[key]
+    end
+
+    def messages!(*filters)
+      @_messages ||= {}
+      key = filters.join
+      @_messages[key] = [] # Clear cache ...
+
       if filters.empty? # Get the basics about all messages ...
         @connection.fetch(1..unlocked_count(:messages), [
                           "UID",
@@ -144,7 +154,7 @@ module Mail
                           "BODY[HEADER.FIELDS (TO)]",
                           "BODY[HEADER.FIELDS (FROM)]"
         ]).each do |f|
-          msgs << Message.send(:new, f.seqno, self,
+          @_messages[key] << Message.send(:new, f.seqno, self,
                                :uid => f.attr["UID"],
                                "headers.subject" => f.attr["BODY[HEADER.FIELDS (SUBJECT)]"],
                                "headers.to" => f.attr["BODY[HEADER.FIELDS (TO)]"],
@@ -156,7 +166,7 @@ module Mail
       # TODO Add special filter translations here ...
       #@connection.search([]).each { |msn| msgs << Message.new(msn, self) } if filters.empty?
 
-      msgs
+      @_messages[key]
     end
 
     alias search messages
