@@ -52,25 +52,6 @@ module Mail
     end
 
     #
-    # === Synopsis
-    #
-    #   Mail::Mailbox#append(message)
-    #
-    # === Arguments
-    #
-    # +message+::
-    #   Message to append to the Mailbox (Mail::Message)
-    #
-    # === Description
-    #
-    # Appends the passed message to the Mailbox. This can be used to create a
-    # new message in the Mailbox or create a duplicate in the Mailbox.
-    #
-    def append(message)
-      @connection.append(@name, message.raw, message.flags, Time.now)
-    end
-
-    #
     # Close the current Mailbox (Expunge and Deselect).
     #
     def close
@@ -96,7 +77,7 @@ module Mail
     #   Mail::Mailbox << message1 << message2 << message3 ...
     #
     def <<(message)
-      @message.new? ? append(message) : message.copy(@name)
+      message.copy(self)
       self
     end
 
@@ -125,29 +106,31 @@ module Mail
     # on the messages.  If no block is passed the list of messages is returned.
     #
     def messages(*filters)
-      @_messages ||= {}
+      @messages ||= {}
       key = filters.join
-      messages!(*filters) unless @_messages.include? key
-      @_messages[key]
+      messages!(*filters) unless @messages.include? key
+      @messages[key]
     end
 
     def messages!(*filters)
-      @_messages ||= {}
+      @messages ||= {}
       key = filters.join
-      @_messages[key] = [] # Clear cache ...
+      @messages[key] = [] # Clear cache ...
 
       if filters.empty? # Get the basics about all messages ...
         @connection.fetch(1..unlocked_count(:messages), [
                           "UID",
-                          "BODY[HEADER.FIELDS (SUBJECT)]",
-                          "BODY[HEADER.FIELDS (TO)]",
-                          "BODY[HEADER.FIELDS (FROM)]"
+                          "BODY.PEEK[HEADER.FIELDS (SUBJECT)]",
+                          "BODY.PEEK[HEADER.FIELDS (TO)]",
+                          "BODY.PEEK[HEADER.FIELDS (FROM)]",
+                          "FLAGS",
         ]).each do |f|
-          @_messages[key] << Message.send(:new, f.seqno, self,
+          @messages[key] << Message.send(:new, f.seqno, self,
                                :uid => f.attr["UID"],
                                "headers.subject" => f.attr["BODY[HEADER.FIELDS (SUBJECT)]"],
                                "headers.to" => f.attr["BODY[HEADER.FIELDS (TO)]"],
-                               "headers.from" => f.attr["BODY[HEADER.FIELDS (FROM)]"]
+                               "headers.from" => f.attr["BODY[HEADER.FIELDS (FROM)]"],
+                               "flags" => f.attr["FLAGS"],
                               )
         end
       end
@@ -155,7 +138,7 @@ module Mail
       # TODO Add special filter translations here ...
       #@connection.search([]).each { |msn| msgs << Message.new(msn, self) } if filters.empty?
 
-      @_messages[key]
+      @messages[key]
     end
 
     alias search messages
@@ -182,6 +165,7 @@ module Mail
     #
     def subscribe
       @connection.subscribe(@name)
+      true
     end
 
     #
@@ -189,6 +173,21 @@ module Mail
     #
     def unsubscribe
       @connection.unsubscribe(@name)
+      true
+    end
+
+    #
+    # Currently subscribed to the mailbox?
+    #
+    def subscribed?
+      not unsubscribed?
+    end
+
+    #
+    # Currently unsubscribed to the mailbox?
+    #
+    def unsubscribed?
+      @connection.lsub("", @name).nil?
     end
 
     #
