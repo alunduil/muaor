@@ -120,11 +120,15 @@ module Mail
     end
 
     def delete!
-      flags |= [:deleted]
+      flags |= Set[:deleted]
     end
 
     def read!
-      flags |= [:seen]
+      flags |= Set[:seen]
+    end
+
+    def unread!
+      flags -= Set[:seen]
     end
   end
 end
