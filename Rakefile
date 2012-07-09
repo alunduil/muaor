@@ -15,7 +15,7 @@ require 'jeweler'
 Jeweler::Task.new do |gem|
   gem.name = "muaor"
   gem.homepage = "http://github.com/alunduil/muaor"
-  gem.license = "GPL-2"
+  gem.license = "MIT"
   gem.summary = %Q{Mail User Agent Objects for Ruby}
   gem.description = %Q{A higher level resource oriented MUA implementation for crafting MUAs, MUA proxies, mail filtering robots, a fetchmail replacement or anything else that requires this type of manipulation of mail.}
   gem.email = "alunduil@alunduil.com"
