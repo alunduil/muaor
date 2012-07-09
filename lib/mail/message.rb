@@ -15,8 +15,15 @@ module Mail
       @data = {}
       kwargs.each do |k,v|
         method, property = k.split('.').map { |i| i.downcase.to_sym }
-        @data[method] ||= {}
-        @data[method][property] = v.split(':', 2).last.strip
+        case method
+        when :flags
+          @data[:flags] = property.to_set 
+        when :raw, :size, :text
+          continue
+        else
+          @data[method] ||= {}
+          @data[method][property] = v.split(':', 2).last.strip
+        end
       end
     end
 
@@ -36,7 +43,7 @@ module Mail
       headers!(*unknown_headers) unless unknown_headers.empty?
 
       return @data[:headers][headers.first] if headers.length == 1
-      @date[:headers].select { |k,v| headers.include? k }
+      @data[:headers].select { |k,v| headers.include? k }
     end
 
     def headers!(*headers)
@@ -48,6 +55,48 @@ module Mail
 
       return @data[:headers][headers.first] if headers.length == 1
       @data[:headers].select { |k,v| headers.include? k }
+    end
+
+    def message_id
+      @data[:envelope] ||= {}
+      @data[:envelope][:message_id] ||= message_id!
+    end
+
+    def message_id!
+      @data[:envelope] ||= {}
+      @data[:envelope][:message_id] = @connection.uid_fetch(@uid, ["ENVELOPE"]).first.attr["ENVELOPE"].message_id
+    end
+
+    def flags
+      @data[:flags] ||= flags!
+    end
+
+    def flags!
+      @data[:flags] = @connection.uid_fetch(uid, ["FLAGS"]).first.attr["FLAGS"].map { |f| f.to_s.downcase.to_sym }.to_set
+    end
+
+    def raw
+      @data[:raw] ||= raw!
+    end
+
+    def raw!
+      @data[:raw] = @connection.uid_fetch(uid, ["BODY[]"]).first.attr["BODY[]"]
+    end
+
+    def size
+      @data[:size] ||= size!
+    end
+
+    def size!
+      @data[:size] = @connection.uid_fetch(uid, ["RFC822.SIZE"]).first.attr["RFC822.SIZE"]
+    end
+
+    def text
+      @data[:text] ||= text!
+    end
+
+    def text!
+      @data[:text] = @connection.uid_fetch(uid, ["BODY[TEXT]"]).first.attr["BODY[TEXT]"]
     end
   end
 end
