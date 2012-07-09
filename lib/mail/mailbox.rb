@@ -41,7 +41,7 @@ module Mail
     attr_reader :name
 
     def to_s
-      @name
+      "#{@account.to_s}/#{@name}"
     end
 
     #
