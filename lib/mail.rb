@@ -61,6 +61,7 @@
 #   end
 #
 module Mail
+  require 'mail/drivers'
   require 'mail/server'
   require 'mail/mailbox'
   require 'mail/message'

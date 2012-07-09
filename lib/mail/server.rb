@@ -3,8 +3,6 @@
 # Expectr is freely distributable under the terms of an MIT-style license.
 # See COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-require 'net/imap'
-
 module Mail
   class Server
     #
@@ -13,7 +11,11 @@ module Mail
     #   Mail::Server.new(host, username, password, kwargs)
     #
     # === Arguments
-    #
+    # +protocol+::
+    #   Protocol to connect to server with (Symbol):
+    # * :imap
+    # * :exchange (not implemented)
+    # * :pop (not implemented)
     # +host+::
     #   Hostname to connect to (String)
     # +username+::
@@ -32,10 +34,11 @@ module Mail
     # Connect to the mail (IMAP) service at +host+ authenticating with
     # +username+ and +password+.
     #
-    def initialize(host, username, password, kwargs = {})
+    def initialize(protocol, host, username, password, kwargs = {})
       kwargs[:method] = :plain if not kwargs.include? :method
       kwargs[:tls] = true if not kwargs.include? :tls
 
+      @protocol = protocol
       @host = host
       @username = username
       @password = password
@@ -49,7 +52,7 @@ module Mail
       nil
     end
 
-    def to_s
+    def to_s # :nodoc:
       "imap#{@tls ? "s" : ""}://#{@username}@#{@host}"
     end
 
@@ -78,7 +81,7 @@ module Mail
     # Log into the mail server specified during instantiation.
     #
     def login
-      @connection = Net::IMAP.new(@host, :ssl => @tls)
+      @connection = Drivers::Driver.new(@protocol, @host, :ssl => @tls)
       raise BadAuthMechanismError, "Expected auth mechanism in (#{authentication_mechanisms}).  Got #{@method}." unless authentication_mechanisms.include? @method
       @connection.authenticate(@method.to_s.upcase, @username, @password)
     end
@@ -90,7 +93,7 @@ module Mail
     # Mail::Server#capabilities!
     #
     def capabilities
-      @_capabilities ||= capabilities!
+      @capabilities ||= capabilities!
     end
 
     alias caps capabilities
@@ -99,7 +102,7 @@ module Mail
     # See Mail::Server#capabilities
     #
     def capabilities!
-      @_capabilities = @connection.capability.map { |c| c.downcase.sub(/\s/, "_").to_sym }
+      @capabilities = @connection.capability.map { |c| c.downcase.sub(/\s/, "_").to_sym }
     end
 
     alias caps! capabilities!
@@ -110,7 +113,7 @@ module Mail
     # Mail::Server#authentication_mechanisms!
     #
     def authentication_mechanisms
-      @_authentication_mechanisms ||= authentication_mechanisms!
+      @authentication_mechanisms ||= authentication_mechanisms!
     end
 
     alias auth_mechs authentication_mechanisms
@@ -119,7 +122,7 @@ module Mail
     # See Mail::Server#authentication_mechanisms
     #
     def authentication_mechanisms!
-      @_authentication_mechanisms = capabilities!.select { |c| c.match(/^auth/i) }.map { |c| c.to_s.split("=").last.to_sym }
+      @authentication_mechanisms = capabilities!.select { |c| c.match(/^auth/i) }.map { |c| c.to_s.split("=").last.to_sym }
     end
 
     alias auth_mechs! authentication_mechanisms!
@@ -146,11 +149,30 @@ module Mail
     #
     # TODO Add an option to search only subscribed mailboxes.
     #
-    def mailboxes(*globs) # TODO Caching of this method sim. capabilities?
-      mbs = []
-      @connection.list("", "*").each { |mb| mbs << Mailbox.send(:new, mb.name, self) } if globs.empty?
-      globs.each { |g| @connection.list("", g).each { | mb| mbs << Mailbox.send(:new, mb.name, self) } }
-      mbs
+    def mailboxes(*globs)
+      @mailboxes ||= {}
+
+      return @mailboxes["*"] ||= mailboxes! if globs.empty?
+
+      unknown_globs = globs.to_set - @mailboxes.keys.to_set
+      mailboxes!(*globs) unless unknown_globs.empty?
+
+      return @mailboxes[globs.first] if globs.length == 1
+      @mailboxes.select { |k,v| globs.include? k }.map { |k,v| v }.flatten
+    end
+
+    #
+    # See Mail::Mailbox#mailboxes
+    #
+    def mailboxes!(*globs)
+      @mailboxes ||= {}
+
+      return @mailboxes["*"] = @connection.list("", "*").map { |mb| Mailbox.send(:new, mb.name, self) } if globs.empty?
+
+      globs.each { |g| @mailboxes[g] = @connection.list("", g).map { |mb| Mailbox.send(:new, mb.name, self) } }
+
+      return @mailboxes[globs.first] if globs.length == 1
+      @mailboxes.select { |k,v| globs.include? k }.map { |k,v| v }.flatten
     end
 
     # 
@@ -233,6 +255,6 @@ module Mail
   #
   #   Mail::Server::BadAuthMechanismError: Expected auth mechanism in ([:ntlm, :gssapi, :login]).  Got plain.
   #
-  class BadAuthMechanismError < Net::IMAP::Error; end
+  class BadAuthMechanismError < ArgumentError; end
 end
 
