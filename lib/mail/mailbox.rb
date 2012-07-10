@@ -51,7 +51,7 @@ module Mail
     # Delete the Mailbox on the server.
     #
     def delete!
-      @server.delete_mailbox(@name)
+      @server.delete_mailbox!(@name)
     end
 
     #
