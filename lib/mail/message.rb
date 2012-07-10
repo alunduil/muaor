@@ -241,14 +241,14 @@ module Mail
     # Delete this message.
     #
     def delete!
-      flags |= Set[:deleted]
+      flags = flags! | Set[:deleted]
     end
 
     #
     # Mark the Message as seen.
     #
     def read!
-      flags |= Set[:seen]
+      flags = flags! | Set[:seen]
     end
 
     alias seen! read!

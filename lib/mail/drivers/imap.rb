@@ -25,7 +25,7 @@ module Mail
       # changing the upstream interface to be more generic.
       #
       def self.new(host, ssl)
-        Net::IMAP.new(host, ssl)
+        return Net::IMAP.new(host, ssl)
       end
     end
   end
@@ -39,7 +39,7 @@ module Net
     class ResponseParser
       def continue_req
         match(T_PLUS)
-        shift_token if lookahead.symbol == T_SPACE #match(T_SPACE)
+        #match(T_SPACE)
         return ContinuationRequest.new(resp_text, @str)
       end
 
