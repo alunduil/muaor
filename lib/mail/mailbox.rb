@@ -109,6 +109,7 @@ module Mail
     #
     def expunge
       @connection.expunge
+      true
     end
 
     #
