@@ -8,7 +8,7 @@ module Mail
     #
     # === Synopsis
     #
-    #   Mail::Server.new(host, username, password, kwargs)
+    #   Mail::Server.new(protocol, host, username, password, kwargs)
     #
     # === Arguments
     # +protocol+::
@@ -53,7 +53,7 @@ module Mail
     end
 
     def to_s # :nodoc:
-      "imap#{@tls ? "s" : ""}://#{@username}@#{@host}"
+      "#{@protocol.to_s}#{@tls ? "s" : ""}://#{@username}@#{@host}"
     end
 
     #
@@ -67,7 +67,7 @@ module Mail
     # the cloned instance.  Multi-connection situations can thus be created
     # with the following idea:
     #
-    #   a = Mail::Server.new(host, username, password)
+    #   a = Mail::Server.new(protocol, host, username, password)
     #   b = a.dup
     #
     # All operations on a and b will be rectified by the server as part of the 
@@ -130,7 +130,7 @@ module Mail
     # 
     # === Synopsis
     #
-    #   Mail::Server#mailboxes([globs, ...]) [ { |mailbox| ... } ]
+    #   Mail::Server#mailboxes([globs, ...])
     #
     # === Arguments
     # +globs+::
@@ -145,7 +145,8 @@ module Mail
     #
     # Return the matched mailboxes for the globs passed (if no globs are passed
     # this returns all mailboxes.  Returns an array of mailboxes 
-    # [Mail::Mailbox].
+    # [Mail::Mailbox].  All results are cached to bypass caching use
+    # Mail::Server#mailboxes!.
     #
     # TODO Add an option to search only subscribed mailboxes.
     #
@@ -190,7 +191,7 @@ module Mail
     #
     def create_mailbox!(name)
       @connection.create(name)
-      mailboxes(name) { |mb| return mb }
+      mailboxes(name).first
     end
 
     # 

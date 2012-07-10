@@ -6,6 +6,27 @@
 module Mail
   module Drivers
     class Driver
+      #
+      # === Synopsis
+      #
+      #   Driver.new(protocol, host, ssl)
+      #
+      # === Arguments
+      # +protocol+::
+      #   Selects the protocol driver
+      # +host+::
+      #   The host to connect to
+      # +ssl+::
+      #   Enables encryption in the driver if applicable
+      #
+      # === Description
+      #
+      # A factory for creating the driver necessary to communicate with the
+      # requested protocol.
+      #
+      # ==== Protocols
+      # * IMAP
+      #
       def self.new(protocol, host, ssl)
         case protocol
         when :imap

@@ -38,16 +38,19 @@ module Mail
 
     private_class_method :new
 
+    #
+    # Name of the Mailbox.
+    #
     attr_reader :name
 
-    def to_s
+    def to_s # :nodoc:
       "#{@account.to_s}/#{@name}"
     end
 
     #
     # Delete the Mailbox on the server.
     #
-    def delete! # TODO Drop the !?
+    def delete!
       @server.delete_mailbox(@name)
     end
 
@@ -57,6 +60,26 @@ module Mail
     def close
       @connection.close()
     end
+
+    #
+    # === Synopsis
+    #
+    #   Mail::Mailbox#append(message)
+    #
+    # === Arguments
+    #
+    # +message+::
+    #   The message to add to the Mailbox (Mail::Message)
+    #
+    # === Description
+    #
+    # Inserts the passed Message into the Mailbox.
+    #
+    def append(message)
+      @connection.append(@name, message.raw, message.flags.each { |f| f.to_s.capitalize.to_sym }, message.date)
+      true
+    end
+    private :append
 
     #
     # === Synopsis
@@ -77,7 +100,7 @@ module Mail
     #   Mail::Mailbox << message1 << message2 << message3 ...
     #
     def <<(message)
-      message.copy(self)
+      message.send(:connection) == @connection ? append(message) : message.copy(self)
       self
     end
 
@@ -91,7 +114,7 @@ module Mail
     #
     # === Synopsis
     #
-    #   Mail::Mailbox#messages([filters, ...]) [ { |message| ... } ]
+    #   Mail::Mailbox#messages([filters, ...])
     #
     # === Arguments
     #
@@ -102,8 +125,9 @@ module Mail
     #     
     # === Description
     #
-    # Return the matched messages from the Mailbox and perform the block action
-    # on the messages.  If no block is passed the list of messages is returned.
+    # Return the matched messages from the Mailbox as an Array.  The results 
+    # are cached but the caching can be bypassed by using
+    # Mail::Mailbox#messages!.
     #
     def messages(*filters)
       @messages ||= {}
@@ -112,6 +136,9 @@ module Mail
       @messages[key]
     end
 
+    # 
+    # See Mail::Mailbox#messages
+    #
     def messages!(*filters)
       @messages ||= {}
       key = filters.join
@@ -197,7 +224,7 @@ module Mail
       @connection.check
     end
 
-    alias save check # TODO Good or not?
+    alias save check
 
     # TODO Add freeze to change select to examine.
     
@@ -292,6 +319,5 @@ module Mail
 
     alias [] locks
   end
-
 end
 
