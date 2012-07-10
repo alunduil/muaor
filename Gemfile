@@ -11,5 +11,6 @@ group :development do
   gem "shoulda", ">= 0"
   gem "rdoc", "~> 3.12"
   gem "jeweler", "~> 1.8.3"
+  gem "aquarium", "~> 0.5.1"
 end
 
