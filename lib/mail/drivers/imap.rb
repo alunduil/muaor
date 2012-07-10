@@ -31,3 +31,34 @@ module Mail
   end
 end
 
+# Hack stolen from http://www.semicomplete.com/blog/tags/imap to counteract the
+# idiocracy which is exchange.
+# TODO Move this to the exchange driver (or exchange IMAP hacks).
+module Net
+  class IMAP
+    class ResponseParser
+      def continue_req
+        match(T_PLUS)
+        #match(T_SPACE)
+        return ContinuationRequest.new(resp_text, @str)
+      end
+
+      def response
+        token = lookahead
+        case token.symbol
+        when T_PLUS
+          result = continue_req
+        when T_STAR
+          result = response_untagged
+        else
+          result = response_tagged
+        end
+        shift_token if lookahead.symbol == T_SPACE
+        match(T_CRLF)
+        match(T_EOF)
+        return result
+      end
+    end
+  end
+end
+
