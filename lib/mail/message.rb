@@ -155,7 +155,7 @@ module Mail
     # Set the flags on the Message
     #
     def flags=(flags)
-      raise ArgumentError, "argument must be of type Set" unless flags.class == Set
+      raise ArgumentError, "argument must be of type Set" unless flags.is_a? Set
       @connection.uid_store(@uid, "FLAGS", flags.map { |f| f.to_s.capitalize.to_sym })
       @data[:flags] = flags
     end
