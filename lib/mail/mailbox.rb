@@ -136,6 +136,8 @@ module Mail
       @messages[key]
     end
 
+    alias search messages
+
     # 
     # See Mail::Mailbox#messages
     #
@@ -168,7 +170,7 @@ module Mail
       @messages[key]
     end
 
-    alias search messages
+    alias search! messages!
 
     #
     # The Mailbox's quota.
@@ -263,7 +265,7 @@ module Mail
       unlocked_count(property)
     end
 
-    around :calls_to => [:sort, :check, :save, :search, :messages, :expunge, :close, :count] do |jp, obj, *args|
+    around :calls_to => [:sort, :check, :save, :search!, :messages!, :expunge, :close, :append, :count] do |jp, obj, *args|
       obj.send(:before)
       result = jp.proceed
       obj.send(:after)
