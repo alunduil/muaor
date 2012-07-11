@@ -45,7 +45,7 @@ module Mail
     attr_reader :name
 
     def to_s # :nodoc:
-      "#{@account.to_s}/#{@name}"
+      "#{@server.to_s}/#{@name}"
     end
 
     #
@@ -56,10 +56,17 @@ module Mail
     end
 
     #
-    # Close the current Mailbox (Expunge and Deselect).
+    # Close the Mailbox (Expunge and Deselect).
     #
     def close
       @connection.close()
+    end
+
+    #
+    # Select the Mailbox
+    #
+    def select
+      @connection.select(@name)
     end
 
     #
@@ -151,7 +158,7 @@ module Mail
     #   Examples:
     #   * "headers.date.<" => Date # Find messages before this date
     #   * "body.~" => Regexp # Find messages whose body matches Regexp
-    #   * "to.<" => Number # Find messages with less than Number of Recipients in To:
+    #   * "to.<" => Number # Find messages with less than Number of Recipients in To: TODO
     #     
     # === Description
     #
@@ -187,7 +194,6 @@ module Mail
                                            "BODY.PEEK[HEADER.FIELDS (FROM)]",
                                            "FLAGS"
         ]).map do |f|
-          @condition.wait(@lock)
           Message.send(:new, f.seqno, self,
                        :uid => f.attr["UID"],
                        "headers.subject" => f.attr["BODY[HEADER.FIELDS (SUBJECT)]"],
@@ -195,26 +201,31 @@ module Mail
                        "headers.from" => f.attr["BODY[HEADER.FIELDS (FROM)]"],
                        "flags" => f.attr["FLAGS"]
           )
+          # TODO @condition.wait(@lock)
         end
         return @messages[key]
       end
+
+      $stderr.puts "filters.has_key? :new => #{filters.has_key? :new}" if $DEBUG
+      $stderr.puts "filters[:new] => #{filters[:new]}" if $DEBUG
 
       filters[:new] = filters.has_key? :new ? filters[:new] : nil
 
       second_pass = {}
       
-      query = [ "#{count}:#{offset}" ]
+      query = [ "#{offset}:#{count}" ]
       filters.each do |k,v|
+        $stderr.puts "Adding: #{k} -> #{v}" if $DEBUG
         case k
         when :new # Allow for other symbol parameters.
-          unless v.nil?
+          unless filters[v].nil?
             query << "NOT" unless v
             query << "NEW"
           end
         else
           selector, operator = k.rsplit('.',2)
           case
-          when selector.starts_with?("header")
+          when selector.start_with?("header")
             header = selector.rsplit('.', 2).last
             case header
             when "date"
@@ -250,7 +261,7 @@ module Mail
                 raise FilterParseError, "Operator, #{operator}, not defined for #{k}"
               end
             end
-          when selector.starts_with?("body")
+          when selector.start_with?("body")
             case operator
             when "~"
               second_pass[k] = v
@@ -268,15 +279,20 @@ module Mail
         end
       end
 
+      $stderr.puts query.join(" ") if $DEBUG
+
       unless filters.empty?
-        @messages[key] = @connection.fetch(@connection.search(query), [
+        fetch_set = @connection.search(query)
+        $stderr.puts "Fetching: #{fetch_set}" if $DEBUG
+        return @messages[key] = [] if fetch_set.empty?
+
+        @messages[key] = @connection.fetch(fetch_set, [
                                            "UID",
                                            "BODY.PEEK[HEADER.FIELDS (SUBJECT)]",
                                            "BODY.PEEK[HEADER.FIELDS (TO)]",
                                            "BODY.PEEK[HEADER.FIELDS (FROM)]",
                                            "FLAGS"
         ]).map do |f|
-          @condition.wait(@lock)
           Message.send(:new, f.seqno, self,
                        :uid => f.attr["UID"],
                        "headers.subject" => f.attr["BODY[HEADER.FIELDS (SUBJECT)]"],
@@ -284,6 +300,7 @@ module Mail
                        "headers.from" => f.attr["BODY[HEADER.FIELDS (FROM)]"],
                        "flags" => f.attr["FLAGS"]
           )
+          # TODO @condition.wait(@lock)
         end
       end
 
@@ -405,7 +422,7 @@ module Mail
 
     def before
       @lock.lock
-      @connection.select(@name)
+      select
     end
 
     def after
@@ -461,6 +478,16 @@ module Mail
     def conditions(connection)
       @conditions[connection] ||= ConditionVariable.new
     end
+  end
+end
+
+class String
+  def rsplit(pattern = $;, limit = 0)
+    reverse.split(pattern, limit).map { |e| e.reverse }.reverse
+  end
+
+  def quote
+    "\"#{self.to_s}\""
   end
 end
 

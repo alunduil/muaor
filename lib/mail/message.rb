@@ -272,11 +272,12 @@ module Mail
     private
 
     def before
-      @lock.lock
+      # TODO @lock.lock
+      @mailbox.select
     end
 
     def after
-      @lock.unlock
+      # TODO @lock.unlock
       @condition.signal
     end
 
