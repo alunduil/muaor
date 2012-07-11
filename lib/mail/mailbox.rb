@@ -144,8 +144,8 @@ module Mail
     #       Identifier for a message section (e.g. headers.date, body, etc)
     #     +OPERATION+::
     #       The operation to compare based on:
-    #       * \> Norm for Numbers but After for Dates
-    #       * \< Norm for Numbers but Before for Dates
+    #       * \> Norm for Numbers but After for Dates and Superset for Set
+    #       * \< Norm for Numbers but Before for Dates and Subset for Set
     #       * \= Norm for Numbers and Dates but Containment for Strings (a.k.a. "".match(/.\*String.\*/)
     #       * \~ Norm for Regexes but acts as = otherwise
     #       * Combinations work as expected:
@@ -275,6 +275,8 @@ module Mail
             else
               raise FilterParseError, "Operator, #{operator}, not defined for #{k}"
             end
+          when selector.start_with?("flag")
+            second_pass[k] = v
           end
         end
       end
