@@ -123,17 +123,44 @@ module Mail
     #   Filters that select particular messages from the Mailbox.
     #
     #   Examples:
+    #   * :count => N # Number of messages to return
+    #   * :offset => N # First message to grab
+    #   * :new => true # Find only new messages. Defaults to false; nil disables new selection
+    #
+    #   The following should not be used with the preceeding as the results are
+    #   not logical.  They search the messages specified and do not return the
+    #   number of messages as implied.
+    #
+    #   * "SELECTOR.OPERATION" => VALUE:
+    #     +SELECTOR+:: 
+    #       Identifier for a message section (e.g. headers.date, body, etc)
+    #     +OPERATION+::
+    #       The operation to compare based on:
+    #       * > Norm for Numbers but After for Dates
+    #       * < Norm for Numbers but Before for Dates
+    #       * = Norm for Numbers and Dates but Containment for Strings (a.k.a. "".match(/.*String.*/)
+    #       * ~ Norm for Regexes but acts as = otherwise
+    #       * Combinations work as expected:
+    #         * <> -> Not equal
+    #         * >= -> Greater than or equal
+    #     +VALUE+::
+    #       An appropriate value for the requested field and operation
+    #
+    #   Examples:
+    #   * "headers.date.<" => Date # Find messages before this date
+    #   * "body.~" => Regexp # Find messages whose body matches Regexp
+    #   * "to.<" => Number # Find messages with less than Number of Recipients in To:
     #     
     # === Description
     #
     # Return the matched messages from the Mailbox as an Array.  The results 
-    # are cached but the caching can be bypassed by using
+    # are cached per filterbut the caching can be bypassed by using
     # Mail::Mailbox#messages!.
     #
-    def messages(*filters)
+    def messages(filters = {})
       @messages ||= {}
-      key = filters.join
-      messages!(*filters) unless @messages.include? key
+      key = filters.to_a.join
+      messages!(filters) unless @messages.include? key
       @messages[key]
     end
 
@@ -142,33 +169,123 @@ module Mail
     # 
     # See Mail::Mailbox#messages
     #
-    def messages!(*filters)
+    def messages!(filters = {})
       @messages ||= {}
-      key = filters.join
+      key = filters.to_a.join
       @messages[key] = [] # Clear cache ...
 
+      count = filters.delete(:count) || unlocked_count(:messages)
+      offset = filters.delete(:offset) || 1
+
       if filters.empty? # Get the basics about all messages ...
-        @connection.fetch(1..unlocked_count(:messages), [
-                          "UID",
-                          "BODY.PEEK[HEADER.FIELDS (SUBJECT)]",
-                          "BODY.PEEK[HEADER.FIELDS (TO)]",
-                          "BODY.PEEK[HEADER.FIELDS (FROM)]",
-                          "FLAGS",
-        ]).each do |f|
-          @messages[key] << Message.send(:new, f.seqno, self,
-                               :uid => f.attr["UID"],
-                               "headers.subject" => f.attr["BODY[HEADER.FIELDS (SUBJECT)]"],
-                               "headers.to" => f.attr["BODY[HEADER.FIELDS (TO)]"],
-                               "headers.from" => f.attr["BODY[HEADER.FIELDS (FROM)]"],
-                               "flags" => f.attr["FLAGS"],
-                              )
+        @messages[key] = @connection.fetch(offset..count, [
+                                           "UID",
+                                           "BODY.PEEK[HEADER.FIELDS (SUBJECT)]",
+                                           "BODY.PEEK[HEADER.FIELDS (TO)]",
+                                           "BODY.PEEK[HEADER.FIELDS (FROM)]",
+                                           "FLAGS"
+        ]).map do |f|
+          Message.send(:new, f.seqno, self,
+                       :uid => f.attr["UID"],
+                       "headers.subject" => f.attr["BODY[HEADER.FIELDS (SUBJECT)]"],
+                       "headers.to" => f.attr["BODY[HEADER.FIELDS (TO)]"],
+                       "headers.from" => f.attr["BODY[HEADER.FIELDS (FROM)]"],
+                       "flags" => f.attr["FLAGS"]
+          )
+        end
+        return @messages[key]
+      end
+
+      filters[:new] = filters.has_key? :new ? filters[:new] : false
+
+      second_pass = {}
+      
+      query = [ "#{count}:#{offset}" ]
+      filters.each do |k,v|
+        case k
+        when :new # Allow for other symbol parameters.
+          unless v.nil?
+            query << "NOT" unless v
+            query << "NEW"
+          end
+        else
+          selector, operator = k.rsplit('.',2)
+          case
+          when selector.starts_with? "header"
+            header = selector.rsplit('.', 2).last
+            case header
+            when "date"
+              date = v.strftime("%d-%b-%Y")
+              case operator
+              when "<"
+                query << "BEFORE" << date
+              when ">"
+                query << "SINCE" << date << "NOT" << "ON" << date
+              when "<>"
+                query << "NOT" << "ON" << date
+              when "<="
+                query << "BEFORE" << date << "ON" << date
+              when ">="
+                query << "SINCE" << date
+              when "="
+                query << "ON" << date
+              else
+                raise FilterParseError, "Operator, #{operator}, not defined for #{k}"
+              end
+            when "subject", "to", "from", "cc"
+              case operator
+              when "~"
+                second_pass[k] = v
+                strings = parse_regex(v)
+                strings[:on].each { |s| query << header.upcase << s }
+                strings[:off].each { |s| query << "NOT" << header.upcase << s }
+              when "="
+                query << header.upcase << v
+              when "<>"
+                query << "NOT" << header.upcase << v
+              else
+                raise FilterParseError, "Operator, #{operator}, not defined for #{k}"
+              end
+          when selector.starts_with? "body"
+            case operator
+            when "~"
+              second_pass[k] = v
+              strings = parse_regex(v)
+              strings[:on].each { |s| query << selector.upcase << s }
+              strings[:off].each { |s| query << "NOT" << selector.upcase << s }
+            when "="
+              query << selector.upcase << v
+            when "<>"
+              query << "NOT" << selector.upcase << v
+            else
+              raise FilterParseError, "Operator, #{operator}, not defined for #{k}"
+            end
+          end
+          end
         end
       end
 
-      # TODO Add special filter translations here ...
-      #@connection.search([]).each { |msn| msgs << Message.new(msn, self) } if filters.empty?
+      unless filters.empty?
+        @messages[key] = @connection.fetch(@connection.search(query), [
+                                           "UID",
+                                           "BODY.PEEK[HEADER.FIELDS (SUBJECT)]",
+                                           "BODY.PEEK[HEADER.FIELDS (TO)]",
+                                           "BODY.PEEK[HEADER.FIELDS (FROM)]",
+                                           "FLAGS"
+        ]).map do |f|
+          Message.send(:new, f.seqno, self,
+                       :uid => f.attr["UID"],
+                       "headers.subject" => f.attr["BODY[HEADER.FIELDS (SUBJECT)]"],
+                       "headers.to" => f.attr["BODY[HEADER.FIELDS (TO)]"],
+                       "headers.from" => f.attr["BODY[HEADER.FIELDS (FROM)]"],
+                       "flags" => f.attr["FLAGS"]
+          )
+        end
+      end
 
-      @messages[key]
+      @messages[key].select do |m|
+        true # TODO Second Pass ...
+      end
     end
 
     alias search! messages!
