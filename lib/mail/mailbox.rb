@@ -33,6 +33,7 @@ module Mail
       @server = server
       @connection = @server.send(:connection)
       @lock = MailboxLock.instance[@connection]
+      @condition = MailboxLock.instance.conditions(@connection)
       @name = name
     end
 
@@ -123,9 +124,9 @@ module Mail
     #   Filters that select particular messages from the Mailbox.
     #
     #   Examples:
-    #   * :count => N # Number of messages to return
-    #   * :offset => N # First message to grab
-    #   * :new => true # Find only new messages. Defaults to false; nil disables new selection
+    #   * +:count+ => N # Number of messages to return
+    #   * +:offset+ => N # First message to grab
+    #   * +:new+ => true # Find only new messages. Defaults to false; nil disables new selection
     #
     #   The following should not be used with the preceeding as the results are
     #   not logical.  They search the messages specified and do not return the
@@ -136,13 +137,14 @@ module Mail
     #       Identifier for a message section (e.g. headers.date, body, etc)
     #     +OPERATION+::
     #       The operation to compare based on:
-    #       * > Norm for Numbers but After for Dates
-    #       * < Norm for Numbers but Before for Dates
-    #       * = Norm for Numbers and Dates but Containment for Strings (a.k.a. "".match(/.*String.*/)
-    #       * ~ Norm for Regexes but acts as = otherwise
+    #       * \> Norm for Numbers but After for Dates
+    #       * \< Norm for Numbers but Before for Dates
+    #       * \= Norm for Numbers and Dates but Containment for Strings (a.k.a. "".match(/.\*String.\*/)
+    #       * \~ Norm for Regexes but acts as = otherwise
     #       * Combinations work as expected:
-    #         * <> -> Not equal
-    #         * >= -> Greater than or equal
+    #         * \<\> Not equal
+    #         * \>\= Greater than or equal
+    #         * etc.
     #     +VALUE+::
     #       An appropriate value for the requested field and operation
     #
@@ -185,6 +187,7 @@ module Mail
                                            "BODY.PEEK[HEADER.FIELDS (FROM)]",
                                            "FLAGS"
         ]).map do |f|
+          @condition.wait(@lock)
           Message.send(:new, f.seqno, self,
                        :uid => f.attr["UID"],
                        "headers.subject" => f.attr["BODY[HEADER.FIELDS (SUBJECT)]"],
@@ -273,6 +276,7 @@ module Mail
                                            "BODY.PEEK[HEADER.FIELDS (FROM)]",
                                            "FLAGS"
         ]).map do |f|
+          @condition.wait(@lock)
           Message.send(:new, f.seqno, self,
                        :uid => f.attr["UID"],
                        "headers.subject" => f.attr["BODY[HEADER.FIELDS (SUBJECT)]"],
@@ -408,6 +412,10 @@ module Mail
       @lock.unlock
     end
 
+    def parse_regex(regex)
+      # TODO Implement Me!
+    end
+
   end
 
   private
@@ -417,6 +425,7 @@ module Mail
 
     def initialize
       @mutexes = {}
+      @conditions = {}
     end
 
     #
@@ -426,18 +435,33 @@ module Mail
     #
     # === Arguments
     # +connection+::
-    #   The connection that we're using is the key for the lock (Net::IMAP)
+    #   The connection that we're using is the key for the lock (Mail::Drivers::Driver)
     #
     # === Description
     #
     # Get the particular mutex for the connection being used by the mailbox.
     #
     def locks(connection)
-      @mutexes[connection] = Mutex.new unless @mutexes.has_key? connection
-      @mutexes[connection]
+      @mutexes[connection] ||= Mutex.new 
     end
 
     alias [] locks
+
+    #
+    # === Synopsis
+    #   
+    #   Mail::MailboxLock#conditions(connection)
+    #
+    # === Arguments
+    # +connection+::
+    #   The connection that we're using is the key for the condition (Mail::Drivers::Driver)
+    #
+    # === Description
+    #
+    # Get the particular condition for the connection being used by the mailbox.
+    #
+    def conditions(connection)
+      @conditions[connection] ||= ConditionVariable.new
   end
 end
 

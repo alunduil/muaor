@@ -40,6 +40,7 @@ module Mail
       @mailbox = mailbox
       @connection = @mailbox.send(:connection)
       @lock = MailboxLock.instance[@connection]
+      @condition = MailboxLock.instance.conditions(@connection)
       @uid = @connection.fetch(msn, "UID").first.attr["UID"] unless @uid = kwargs.delete(:uid)
 
       @data = {}
@@ -260,6 +261,25 @@ module Mail
     end
 
     alias unseen! unread!
+
+    around :calls_to => [:initialize, :headers!, :message_id!, :envelope!, :flags!, :flags=, :raw!, :size!, :text!, :copy] do |jp, obj, *args|
+      obj.send(:before)
+      result = jp.proceed
+      obj.send(:after)
+      result
+    end
+
+    private
+
+    def before
+      @lock.lock
+    end
+
+    def after
+      @lock.unlock
+      @condition.signal
+    end
+
   end
 end
 
