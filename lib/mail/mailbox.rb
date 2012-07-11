@@ -32,7 +32,7 @@ module Mail
     def initialize(name, server)
       @server = server
       @connection = @server.send(:connection)
-      @lock = MailboxLock.instance[@connection]
+      @lock = MailboxLock.instance.locks(@connection)
       @condition = MailboxLock.instance.conditions(@connection)
       @name = name
     end
@@ -126,7 +126,7 @@ module Mail
     #   Examples:
     #   * +:count+ => N # Number of messages to return
     #   * +:offset+ => N # First message to grab
-    #   * +:new+ => true # Find only new messages. Defaults to false; nil disables new selection
+    #   * +:new+ => true # Find only new messages. Defaults to nil; nil disables new selection
     #
     #   The following should not be used with the preceeding as the results are
     #   not logical.  They search the messages specified and do not return the
@@ -199,7 +199,7 @@ module Mail
         return @messages[key]
       end
 
-      filters[:new] = filters.has_key? :new ? filters[:new] : false
+      filters[:new] = filters.has_key? :new ? filters[:new] : nil
 
       second_pass = {}
       
@@ -214,7 +214,7 @@ module Mail
         else
           selector, operator = k.rsplit('.',2)
           case
-          when selector.starts_with? "header"
+          when selector.starts_with?("header")
             header = selector.rsplit('.', 2).last
             case header
             when "date"
@@ -249,7 +249,8 @@ module Mail
               else
                 raise FilterParseError, "Operator, #{operator}, not defined for #{k}"
               end
-          when selector.starts_with? "body"
+            end
+          when selector.starts_with?("body")
             case operator
             when "~"
               second_pass[k] = v
@@ -263,7 +264,6 @@ module Mail
             else
               raise FilterParseError, "Operator, #{operator}, not defined for #{k}"
             end
-          end
           end
         end
       end
@@ -414,8 +414,8 @@ module Mail
 
     def parse_regex(regex)
       # TODO Implement Me!
+      return
     end
-
   end
 
   private
@@ -445,8 +445,6 @@ module Mail
       @mutexes[connection] ||= Mutex.new 
     end
 
-    alias [] locks
-
     #
     # === Synopsis
     #   
@@ -462,6 +460,7 @@ module Mail
     #
     def conditions(connection)
       @conditions[connection] ||= ConditionVariable.new
+    end
   end
 end
 

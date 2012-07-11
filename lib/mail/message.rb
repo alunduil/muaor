@@ -39,7 +39,7 @@ module Mail
     def initialize(msn, mailbox, kwargs = {})
       @mailbox = mailbox
       @connection = @mailbox.send(:connection)
-      @lock = MailboxLock.instance[@connection]
+      @lock = MailboxLock.instance.locks(@connection)
       @condition = MailboxLock.instance.conditions(@connection)
       @uid = @connection.fetch(msn, "UID").first.attr["UID"] unless @uid = kwargs.delete(:uid)
 
