@@ -54,7 +54,7 @@ module Mail
           continue
         else
           @data[method] ||= {}
-          @data[method][property] = v.split(':', 2).last.strip
+          @data[method][property] = mogrify_header(property, v)
         end
       end
     end
@@ -104,11 +104,25 @@ module Mail
       @data[:headers] ||= {}
 
       keys = Hash.new { |h, k| h[k] = "BODY.PEEK[HEADER.FIELDS (#{k.to_s.upcase})]" }
-      headers.each { |h| @data[:headers][h] = @connection.uid_fetch(@uid, keys[h]).first.attr[keys[h].sub(/\.PEEK/, "")].split(':', 2).last.strip }
+      headers.each do |h| 
+        @data[:headers][h] = mogrify_header(h, @connection.uid_fetch(@uid, keys[h]).first.attr[keys[h].sub(/\.PEEK/, "")])
+      end
 
       return @data[:headers][headers.first] if headers.length == 1
       @data[:headers].select { |k,v| headers.include? k }
     end
+
+    def mogrify_header(header, value)
+      value = value.split(':', 2).last.strip.gsub(/\s+/, " ")
+      case header
+      when :subject then return value
+      else # TODO Add more exceptions here ...
+        puts value if $DEBUG
+        value = value.split(',')
+      end
+      value
+    end
+    private :mogrify_header
 
     #
     # Message ID of the Message

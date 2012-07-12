@@ -185,6 +185,8 @@ module Mail
 
       count = filters.delete(:count) || unlocked_count(:messages)
       offset = filters.delete(:offset) || 1
+      
+      return [] if count < 1
 
       if filters.empty? # Get the basics about all messages ...
         @messages[key] = @connection.fetch(offset..count, [
@@ -481,6 +483,7 @@ module Mail
       @conditions[connection] ||= ConditionVariable.new
     end
   end
+
 end
 
 class String
