@@ -195,8 +195,8 @@ module Mail
                                            "BODY.PEEK[HEADER.FIELDS (FROM)]",
                                            "FLAGS"
         ]).each do |f|
-          after
           @messages[key] ||= []
+          after
           @messages[key] << Message.send(:new, f.seqno, self,
                        :uid => f.attr["UID"],
                        "headers.subject" => f.attr["BODY[HEADER.FIELDS (SUBJECT)]"],
@@ -302,8 +302,8 @@ module Mail
                                            "BODY.PEEK[HEADER.FIELDS (FROM)]",
                                            "FLAGS"
         ]).each do |f|
-          after
           @messages[key] ||= []
+          after
           @messages[key] << Message.send(:new, f.seqno, self,
                        :uid => f.attr["UID"],
                        "headers.subject" => f.attr["BODY[HEADER.FIELDS (SUBJECT)]"],
