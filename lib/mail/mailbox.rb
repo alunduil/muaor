@@ -188,15 +188,16 @@ module Mail
       return [] if count < 1
 
       if filters.empty? # Get the basics about all messages ...
-        @messages[key] = @connection.fetch(offset..count, [
+        @connection.fetch(offset..count, [
                                            "UID",
                                            "BODY.PEEK[HEADER.FIELDS (SUBJECT)]",
                                            "BODY.PEEK[HEADER.FIELDS (TO)]",
                                            "BODY.PEEK[HEADER.FIELDS (FROM)]",
                                            "FLAGS"
-        ]).map do |f|
+        ]).each do |f|
           after
-          Message.send(:new, f.seqno, self,
+          @messages[key] ||= []
+          @messages[key] << Message.send(:new, f.seqno, self,
                        :uid => f.attr["UID"],
                        "headers.subject" => f.attr["BODY[HEADER.FIELDS (SUBJECT)]"],
                        "headers.to" => f.attr["BODY[HEADER.FIELDS (TO)]"],
@@ -294,15 +295,16 @@ module Mail
         $stderr.puts "Fetching: #{fetch_set}" if $DEBUG
         return @messages[key] = [] if fetch_set.empty?
 
-        @messages[key] = @connection.fetch(fetch_set, [
+        @connection.fetch(fetch_set, [
                                            "UID",
                                            "BODY.PEEK[HEADER.FIELDS (SUBJECT)]",
                                            "BODY.PEEK[HEADER.FIELDS (TO)]",
                                            "BODY.PEEK[HEADER.FIELDS (FROM)]",
                                            "FLAGS"
-        ]).map do |f|
+        ]).each do |f|
           after
-          Message.send(:new, f.seqno, self,
+          @messages[key] ||= []
+          @messages[key] << Message.send(:new, f.seqno, self,
                        :uid => f.attr["UID"],
                        "headers.subject" => f.attr["BODY[HEADER.FIELDS (SUBJECT)]"],
                        "headers.to" => f.attr["BODY[HEADER.FIELDS (TO)]"],
