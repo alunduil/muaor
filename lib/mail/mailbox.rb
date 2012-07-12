@@ -259,6 +259,10 @@ module Mail
                 query << header.upcase << v
               when "<>"
                 query << "NOT" << header.upcase << v
+              when "<"
+                second_pass[k] = v unless header == "subject"
+              when ">"
+                second_pass[k] = v unless header == "subject"
               else
                 raise FilterParseError, "Operator, #{operator}, not defined for #{k}"
               end
@@ -434,8 +438,18 @@ module Mail
     end
 
     def parse_regex(regex)
-      # TODO Implement Me!
-      return
+      regex = regex..to_s.split(":", 2).last.chop
+
+      strings = {}
+      strings[:on] = []
+      strings[:off] = []
+
+      regex.split("").each_with_index do |c, i|
+        lookahead = lambda { regex[i +  1] unless i == regex.length }
+        lookbehind = lambda { regex[i - 1] unless i == 1 }
+      end
+      # TODO Review the dragon book to perform the translation desired.
+      strings
     end
   end
 
@@ -489,10 +503,6 @@ end
 class String
   def rsplit(pattern = $;, limit = 0)
     reverse.split(pattern, limit).map { |e| e.reverse }.reverse
-  end
-
-  def quote
-    "\"#{self.to_s}\""
   end
 end
 
