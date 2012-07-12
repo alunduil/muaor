@@ -40,7 +40,6 @@ module Mail
       @mailbox = mailbox
       @connection = @mailbox.send(:connection)
       @lock = MailboxLock.instance.locks(@connection)
-      @condition = MailboxLock.instance.conditions(@connection)
       @uid = @connection.fetch(msn, "UID").first.attr["UID"] unless @uid = kwargs.delete(:uid)
 
       @data = {}
@@ -286,13 +285,12 @@ module Mail
     private
 
     def before
-      # TODO @lock.lock
+      @lock.lock
       @mailbox.select
     end
 
     def after
-      # TODO @lock.unlock
-      @condition.signal
+      @lock.unlock
     end
 
   end

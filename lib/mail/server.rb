@@ -41,7 +41,7 @@ module Mail
       @protocol = protocol
       @host = host
       @username = username
-      @password = password
+      @password = password # TOOD Remove me?
       @method = kwargs[:method]
       @tls = kwargs[:tls]
 

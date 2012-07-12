@@ -33,7 +33,6 @@ module Mail
       @server = server
       @connection = @server.send(:connection)
       @lock = MailboxLock.instance.locks(@connection)
-      @condition = MailboxLock.instance.conditions(@connection)
       @name = name
     end
 
@@ -196,6 +195,7 @@ module Mail
                                            "BODY.PEEK[HEADER.FIELDS (FROM)]",
                                            "FLAGS"
         ]).map do |f|
+          after
           Message.send(:new, f.seqno, self,
                        :uid => f.attr["UID"],
                        "headers.subject" => f.attr["BODY[HEADER.FIELDS (SUBJECT)]"],
@@ -203,7 +203,7 @@ module Mail
                        "headers.from" => f.attr["BODY[HEADER.FIELDS (FROM)]"],
                        "flags" => f.attr["FLAGS"]
           )
-          # TODO @condition.wait(@lock)
+          before
         end
         return @messages[key]
       end
@@ -301,6 +301,7 @@ module Mail
                                            "BODY.PEEK[HEADER.FIELDS (FROM)]",
                                            "FLAGS"
         ]).map do |f|
+          after
           Message.send(:new, f.seqno, self,
                        :uid => f.attr["UID"],
                        "headers.subject" => f.attr["BODY[HEADER.FIELDS (SUBJECT)]"],
@@ -308,7 +309,7 @@ module Mail
                        "headers.from" => f.attr["BODY[HEADER.FIELDS (FROM)]"],
                        "flags" => f.attr["FLAGS"]
           )
-          # TODO @condition.wait(@lock)
+          before
         end
       end
 
@@ -460,7 +461,6 @@ module Mail
 
     def initialize
       @mutexes = {}
-      @conditions = {}
     end
 
     #
@@ -478,23 +478,6 @@ module Mail
     #
     def locks(connection)
       @mutexes[connection] ||= Mutex.new 
-    end
-
-    #
-    # === Synopsis
-    #   
-    #   Mail::MailboxLock#conditions(connection)
-    #
-    # === Arguments
-    # +connection+::
-    #   The connection that we're using is the key for the condition (Mail::Drivers::Driver)
-    #
-    # === Description
-    #
-    # Get the particular condition for the connection being used by the mailbox.
-    #
-    def conditions(connection)
-      @conditions[connection] ||= ConditionVariable.new
     end
   end
 
