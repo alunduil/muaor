@@ -323,6 +323,37 @@ module Mail
     alias search! messages!
 
     #
+    # === Synopsis
+    #
+    #   Mail::Mailbox#batch(:action => Enumarable(Messages)[, ...])
+    #
+    # === Arguments
+    # +actions+::
+    #   Hash of action requested (i.e. :delete, :move, :copy) to enumerable
+    #   containing Messages to apply the action.
+    #
+    # * :delete -> Deletes the specified messages from this Mailbox
+    # * :copy -> Copies the specified messages into this Mailbox
+    # * :move -> Moves the specified messages into this Mailbox
+    # * :read -> Mark all specified messages read
+    #
+    # === Description
+    #
+    # Allows for batch operations on messages (using the upstream protocols capabilities).
+    #
+    def batch(actions = {})
+      actions.each do |k,v|
+        case k
+        when :delete
+          @connection.store(v.map { |m| m.msn! }, "+FLAGS", [:Deleted])
+        when :read
+          @connection.store(v.map { |m| m.msn! }, "+FLAGS", [:Seen])
+        end
+      end
+      true
+    end
+
+    #
     # The Mailbox's quota.
     #
     def quota

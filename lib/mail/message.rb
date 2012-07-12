@@ -65,6 +65,14 @@ module Mail
     #
     attr_reader :uid
 
+    def msn
+      @msn ||= msn!
+    end
+
+    def msn!
+      @msn = @connection.uid_fetch(@uid, []).first.seqno
+    end
+
     def to_s # :nodoc:
       "#{@uid} # #{headers(:from)} -> #{headers(:to)} :: #{headers(:subject)}"
     end
