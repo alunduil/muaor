@@ -71,26 +71,6 @@ module Mail
     #
     # === Synopsis
     #
-    #   Mail::Mailbox#append(message)
-    #
-    # === Arguments
-    #
-    # +message+::
-    #   The message to add to the Mailbox (Mail::Message)
-    #
-    # === Description
-    #
-    # Inserts the passed Message into the Mailbox.
-    #
-    def append(message)
-      @connection.append(@name, message.raw, message.flags.each { |f| f.to_s.capitalize.to_sym }, message.date)
-      true
-    end
-    private :append
-
-    #
-    # === Synopsis
-    #
     #   Mail::Mailbox#<<(message)
     #
     #   Mail::Mailbox << message
@@ -332,10 +312,15 @@ module Mail
     #   Hash of action requested (i.e. :delete, :move, :copy) to enumerable
     #   containing Messages to apply the action.
     #
-    # * :delete -> Deletes the specified messages from this Mailbox
-    # * :copy -> Copies the specified messages into this Mailbox
-    # * :move -> Moves the specified messages into this Mailbox
-    # * :read -> Mark all specified messages read
+    # * +:delete+ -> Deletes the specified messages from this Mailbox
+    # * +:copy+ -> Copies the specified messages into this Mailbox
+    # * +:move+ -> Moves the specified messages into this Mailbox
+    # * +:read+ -> Mark all specified messages read
+    #
+    #   The values of the hashes are Enumerables of Messages but the following
+    #   values are also accepted for the specified special cases:
+    #
+    # * +:all+ -> Acts on all messages
     #
     # === Description
     #
@@ -343,11 +328,12 @@ module Mail
     #
     def batch(actions = {})
       actions.each do |k,v|
+        v = v == :all ? 0..unlocked_count(:messages) : v.map { |m| m.uid }
         case k
         when :delete
-          @connection.store(v.map { |m| m.msn! }, "+FLAGS", [:Deleted])
+          @connection.uid_store(v, "+FLAGS", [:Deleted])
         when :read
-          @connection.store(v.map { |m| m.msn! }, "+FLAGS", [:Seen])
+          @connection.uid_store(v, "+FLAGS", [:Seen])
         end
       end
       true
@@ -446,7 +432,7 @@ module Mail
       unlocked_count(property)
     end
 
-    around :calls_to => [:sort, :check, :save, :search!, :messages!, :expunge, :close, :append, :count] do |jp, obj, *args|
+    around :calls_to => [:sort, :check, :save, :search!, :messages!, :expunge, :close, :append, :count, :batch] do |jp, obj, *args|
       obj.send(:before)
       result = jp.proceed
       obj.send(:after)
@@ -456,6 +442,25 @@ module Mail
     private
 
     attr_reader :connection
+    
+    #
+    # === Synopsis
+    #
+    #   Mail::Mailbox#append(message)
+    #
+    # === Arguments
+    #
+    # +message+::
+    #   The message to add to the Mailbox (Mail::Message)
+    #
+    # === Description
+    #
+    # Inserts the passed Message into the Mailbox.
+    #
+    def append(message)
+      @connection.append(@name, message.raw, message.flags.each { |f| f.to_s.capitalize.to_sym }, message.date)
+      true
+    end
 
     def unlocked_count(property)
       key = property.to_s.upcase

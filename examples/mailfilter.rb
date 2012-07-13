@@ -23,8 +23,6 @@ puts ""
 s = Mail::Server.new(opts[:protocol], opts[:hostname], opts[:username], opts[:password])
 
 s.mailboxes.each do |b|
-  puts "Mailbox: #{b}"
-  puts "Locked? #{Mail::MailboxLock.instance.locks(s.send(:connection)).locked?}"
   deletes = b.messages("headers.to.=" => "ssl")
   puts "Delete the following:"
   deletes.each { |d| puts d }
