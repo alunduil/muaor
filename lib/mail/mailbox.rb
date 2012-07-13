@@ -328,12 +328,24 @@ module Mail
     #
     def batch(actions = {})
       actions.each do |k,v|
-        v = v == :all ? 0..unlocked_count(:messages) : v.map { |m| m.uid }
+        v = v == :all ? @connection.fetch(0..unlocked_count(:messages), ["UID"]).map { |m| m.attr["UID"] } : v.map { |m| m.uid }
+        # TODO Check the effects when :all is passed to copy or move ... Idempotent or duplicating?
         case k
         when :delete
           @connection.uid_store(v, "+FLAGS", [:Deleted])
         when :read
           @connection.uid_store(v, "+FLAGS", [:Seen])
+        when :copy
+          Set.new(v).classify { |b| v.mailbox }.each do |b,m|
+            b.select
+            @connection.uid_copy(m, @name)
+          end
+        when :move
+          Set.new(v).classify { |b| v.mailbox }.each do |b,m|
+            b.select
+            @connection.uid_copy(m, @name)
+            @connection.uid_store(m, "+FLAGS", [:Deleted])
+          end
         end
       end
       true
