@@ -118,10 +118,9 @@ module Mail
 
     def mogrify_header(header, value)
       value = value.split(':', 2).last.strip.gsub(/\s+/, " ")
-      case header
+      case header # TODO Add more exceptions here ...
       when :subject then return value
-      else # TODO Add more exceptions here ...
-        puts value if $DEBUG
+      else
         value = value.split(',')
       end
       value

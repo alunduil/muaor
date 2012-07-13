@@ -2,7 +2,7 @@
 
 require 'mail'
 require 'optparse'
-require 'pp'
+require 'date'
 
 opts = { :protocol => :imap }
 OptionParser.new do |o|
@@ -22,35 +22,44 @@ $stdout.puts ""
 
 s = Mail::Server.new(opts[:protocol], opts[:hostname], opts[:username], opts[:password])
 
-puts "Expunging and flushing all changes ..."
+print "Expunging and flushing all changes ... "
 s.mailboxes.each { |b| b.check }
+puts "OK"
 
 puts "Deleting all messages in all mailboxes with \"ssl\" in the To: header ..."
 s.mailboxes.each do |b|
+  print "  Deleting in #{b} ... "
   deletes = b.messages("headers.to.=" => "ssl")
   b.batch(:delete => deletes)
+  puts "OK"
 end
 
-puts "Moving all messages with a mailing list designation (e.g. /\[.*?\]/) into an appropriate mailbox ..."
-s.mailboxes.each do |b|
-  moves = b.messages("headers.subject.~" => /\[.*?\]/)
-  Set.new(moves).classify { |m| m.headers(:subject).match(/\[(.*?)\]/)[1] }.each do |n, m|
-    mailbox = s.mailboxes("INBOX/Mailing Lists/#{n}") || s.create_mailbox("INBOX/Mailing Lists/#{n}")
-    mailbox.batch(:move => m)
-  end
-end
+#puts "Moving all messages with a mailing list designation (e.g. /\[.*?\]/) into an appropriate mailbox ..."
+#s.mailboxes.each do |b|
+#  puts "  Moving Messages from #{b}:"
+#  moves = b.messages("headers.subject.~" => /\[.*?\]/)
+#  Set.new(moves).classify { |m| m.headers(:subject).match(/\[(.*?)\]/)[1] }.each do |n, m|
+#    mailbox = s.mailboxes("INBOX/Mailing Lists/#{n}") || s.create_mailbox("INBOX/Mailing Lists/#{n}")
+#    print "    Moving Messages to #{mailbox} ... "
+#    mailbox.batch(:move => m)
+#    puts "OK"
+#  end
+#end
 
 puts "Deleting all mailing list messages older than seven days ..."
 s.mailboxes("INBOX/Mailing Lists/%").each do |b|
+  print "  Deleting old messages in #{b} ... "
   deletes = b.messages("headers.date.<" => Date.today - 7)
   b.batch(:delete => deletes)
+  puts "OK"
 end
 
-puts "Deleting all messages in \"Deleted Items\" ..."
+print "Deleting all messages in \"Deleted Items\" ... "
 s.mailboxes("Deleted Items").each do |b|
   b.batch(:delete => :all)
 end
+puts "OK"
 
-puts "Expunging and flushing all changes ..."
+print "Expunging and flushing all changes ... "
 s.mailboxes.each { |b| b.check }
-
+puts "OK"

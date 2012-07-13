@@ -33,6 +33,7 @@ module Mail
       @server = server
       @connection = @server.send(:connection)
       @lock = MailboxLock.instance.locks(@connection)
+      @slice_size = 1000
       @name = name
     end
 
@@ -168,23 +169,25 @@ module Mail
       return [] if count < 1
 
       if filters.empty? # Get the basics about all messages ...
-        @connection.fetch(offset..count, [
-                                           "UID",
-                                           "BODY.PEEK[HEADER.FIELDS (SUBJECT)]",
-                                           "BODY.PEEK[HEADER.FIELDS (TO)]",
-                                           "BODY.PEEK[HEADER.FIELDS (FROM)]",
-                                           "FLAGS"
-        ]).each do |f|
-          @messages[key] ||= []
-          after
-          @messages[key] << Message.send(:new, f.seqno, self,
-                       :uid => f.attr["UID"],
-                       "headers.subject" => f.attr["BODY[HEADER.FIELDS (SUBJECT)]"],
-                       "headers.to" => f.attr["BODY[HEADER.FIELDS (TO)]"],
-                       "headers.from" => f.attr["BODY[HEADER.FIELDS (FROM)]"],
-                       "flags" => f.attr["FLAGS"]
-          )
-          before
+        (offset..count).each_slice(@slice_size) do |s|
+          @connection.fetch(s, [
+                                             "UID",
+                                             "BODY.PEEK[HEADER.FIELDS (SUBJECT)]",
+                                             "BODY.PEEK[HEADER.FIELDS (TO)]",
+                                             "BODY.PEEK[HEADER.FIELDS (FROM)]",
+                                             "FLAGS"
+          ]).each do |f|
+            @messages[key] ||= []
+            after
+            @messages[key] << Message.send(:new, f.seqno, self,
+                         :uid => f.attr["UID"],
+                         "headers.subject" => f.attr["BODY[HEADER.FIELDS (SUBJECT)]"],
+                         "headers.to" => f.attr["BODY[HEADER.FIELDS (TO)]"],
+                         "headers.from" => f.attr["BODY[HEADER.FIELDS (FROM)]"],
+                         "flags" => f.attr["FLAGS"]
+            )
+            before
+          end
         end
         return @messages[key]
       end
@@ -275,23 +278,26 @@ module Mail
         $stderr.puts "Fetching: #{fetch_set}" if $DEBUG
         return @messages[key] = [] if fetch_set.empty?
 
-        @connection.fetch(fetch_set, [
-                                           "UID",
-                                           "BODY.PEEK[HEADER.FIELDS (SUBJECT)]",
-                                           "BODY.PEEK[HEADER.FIELDS (TO)]",
-                                           "BODY.PEEK[HEADER.FIELDS (FROM)]",
-                                           "FLAGS"
-        ]).each do |f|
-          @messages[key] ||= []
-          after
-          @messages[key] << Message.send(:new, f.seqno, self,
-                       :uid => f.attr["UID"],
-                       "headers.subject" => f.attr["BODY[HEADER.FIELDS (SUBJECT)]"],
-                       "headers.to" => f.attr["BODY[HEADER.FIELDS (TO)]"],
-                       "headers.from" => f.attr["BODY[HEADER.FIELDS (FROM)]"],
-                       "flags" => f.attr["FLAGS"]
-          )
-          before
+        fetch_set.each_slice(@slice_size) do |s|
+          $stderr.puts "  Fetching: #{s}" if $DEBUG
+          @connection.fetch(s, [
+                                             "UID",
+                                             "BODY.PEEK[HEADER.FIELDS (SUBJECT)]",
+                                             "BODY.PEEK[HEADER.FIELDS (TO)]",
+                                             "BODY.PEEK[HEADER.FIELDS (FROM)]",
+                                             "FLAGS"
+          ]).each do |f|
+            @messages[key] ||= []
+            after
+            @messages[key] << Message.send(:new, f.seqno, self,
+                         :uid => f.attr["UID"],
+                         "headers.subject" => f.attr["BODY[HEADER.FIELDS (SUBJECT)]"],
+                         "headers.to" => f.attr["BODY[HEADER.FIELDS (TO)]"],
+                         "headers.from" => f.attr["BODY[HEADER.FIELDS (FROM)]"],
+                         "flags" => f.attr["FLAGS"]
+            )
+            before
+          end
         end
       end
 
@@ -329,22 +335,25 @@ module Mail
     def batch(actions = {})
       actions.each do |k,v|
         v = v == :all ? @connection.fetch(0..unlocked_count(:messages), ["UID"]).map { |m| m.attr["UID"] } : v.map { |m| m.uid }
-        # TODO Check the effects when :all is passed to copy or move ... Idempotent or duplicating?
-        case k
-        when :delete
-          @connection.uid_store(v, "+FLAGS", [:Deleted])
-        when :read
-          @connection.uid_store(v, "+FLAGS", [:Seen])
-        when :copy
-          Set.new(v).classify { |b| v.mailbox }.each do |b,m|
-            b.select
-            @connection.uid_copy(m, @name)
-          end
-        when :move
-          Set.new(v).classify { |b| v.mailbox }.each do |b,m|
-            b.select
-            @connection.uid_copy(m, @name)
-            @connection.uid_store(m, "+FLAGS", [:Deleted])
+        return if v.empty?
+        v.each_slice(@slice_size) do |s|
+          # TODO Check the effects when :all is passed to copy or move ... Idempotent or duplicating?
+          case k
+          when :delete
+            @connection.uid_store(s, "+FLAGS", [:Deleted])
+          when :read
+            @connection.uid_store(s, "+FLAGS", [:Seen])
+          when :copy
+            Set.new(s).classify { |m| m.mailbox }.each do |b,m|
+              b.select
+              @connection.uid_copy(m, @name)
+            end
+          when :move
+            Set.new(s).classify { |m| m.mailbox }.each do |b,m|
+              b.select
+              @connection.uid_copy(m, @name)
+              @connection.uid_store(m, "+FLAGS", [:Deleted])
+            end
           end
         end
       end
