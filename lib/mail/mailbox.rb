@@ -11,6 +11,11 @@ module Mail
   class Mailbox
     include Aquarium::DSL
 
+    #
+    # Size of slices to send to upstream mail servers.
+    #
+    SLICE_SIZE = 2000
+
     # 
     # === Synopsis
     #
@@ -33,7 +38,6 @@ module Mail
       @server = server
       @connection = @server.send(:connection)
       @lock = MailboxLock.instance.locks(@connection)
-      @slice_size = 1000
       @name = name
     end
 
@@ -169,7 +173,7 @@ module Mail
       return [] if count < 1
 
       if filters.empty? # Get the basics about all messages ...
-        (offset..count).each_slice(@slice_size) do |s|
+        (offset..count).each_slice(SLICE_SIZE) do |s|
           @connection.fetch(s, [
                                              "UID",
                                              "BODY.PEEK[HEADER.FIELDS (SUBJECT)]",
@@ -278,7 +282,7 @@ module Mail
         $stderr.puts "Fetching: #{fetch_set}" if $DEBUG
         return @messages[key] = [] if fetch_set.empty?
 
-        fetch_set.each_slice(@slice_size) do |s|
+        fetch_set.each_slice(SLICE_SIZE) do |s|
           $stderr.puts "  Fetching: #{s}" if $DEBUG
           @connection.fetch(s, [
                                              "UID",
@@ -334,9 +338,19 @@ module Mail
     #
     def batch(actions = {})
       actions.each do |k,v|
-        v = v == :all ? @connection.fetch(0..unlocked_count(:messages), ["UID"]).map { |m| m.attr["UID"] } : v.map { |m| m.uid }
-        return if v.empty?
-        v.each_slice(@slice_size) do |s|
+        set = []
+
+        if v == :all
+          (1..unlocked_count(:messages)).each_slice(SLICE_SIZE) do |s|
+            set += @connection.fetch(s, ["UID"]).map { |m| m.attr["UID"] }
+          end
+        else
+          set = v.map { |m| m.uid }
+        end
+
+        return if set.empty?
+
+        set.each_slice(SLICE_SIZE) do |s|
           # TODO Check the effects when :all is passed to copy or move ... Idempotent or duplicating?
           case k
           when :delete

@@ -23,13 +23,14 @@ $stdout.puts ""
 s = Mail::Server.new(opts[:protocol], opts[:hostname], opts[:username], opts[:password])
 
 print "Expunging and flushing all changes ... "
-s.mailboxes.each { |b| b.check }
+s.mailboxes.each { |b| b.expunge }
 puts "OK"
 
 puts "Deleting all messages in all mailboxes with \"ssl\" in the To: header ..."
 s.mailboxes.each do |b|
   print "  Deleting in #{b} ... "
   deletes = b.messages("headers.to.=" => "ssl")
+  print "#{deletes.length} ... "
   b.batch(:delete => deletes)
   puts "OK"
 end
@@ -40,7 +41,7 @@ end
 #  moves = b.messages("headers.subject.~" => /\[.*?\]/)
 #  Set.new(moves).classify { |m| m.headers(:subject).match(/\[(.*?)\]/)[1] }.each do |n, m|
 #    mailbox = s.mailboxes("INBOX/Mailing Lists/#{n}") || s.create_mailbox("INBOX/Mailing Lists/#{n}")
-#    print "    Moving Messages to #{mailbox} ... "
+#    print "    Moving Messages to #{mailbox} ... #{m.length} ... "
 #    mailbox.batch(:move => m)
 #    puts "OK"
 #  end
@@ -50,6 +51,7 @@ puts "Deleting all mailing list messages older than seven days ..."
 s.mailboxes("INBOX/Mailing Lists/%").each do |b|
   print "  Deleting old messages in #{b} ... "
   deletes = b.messages("headers.date.<" => Date.today - 7)
+  print "#{deletes.length} ... "
   b.batch(:delete => deletes)
   puts "OK"
 end
@@ -61,5 +63,5 @@ end
 puts "OK"
 
 print "Expunging and flushing all changes ... "
-s.mailboxes.each { |b| b.check }
+s.mailboxes.each { |b| b.expunge }
 puts "OK"
