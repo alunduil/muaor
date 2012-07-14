@@ -14,7 +14,7 @@ module Mail
     #
     # Size of slices to send to upstream mail servers.
     #
-    SLICE_SIZE = 2000
+    SLICE_SIZE = 3000
 
     # 
     # === Synopsis

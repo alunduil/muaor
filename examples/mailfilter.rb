@@ -58,11 +58,20 @@ end
 
 print "Archiving Old INBOX Messages ... "
 s.mailboxes("INBOX").each do |b|
-  moves = b.messages("headers.date.<" => Date.today - (Date.today.leap? ? 366 : 365))
+  moves = b.messages("headers.date.<" => Date.today << 12)
   print "#{moves.length} ... "
   archive = s.mailboxes("INBOX/Archive").first || s.create_mailbox!("INBOX/Archive")
   archive.subscribe
   archive.batch(:move => moves)
+  puts "OK"
+end
+
+puts "Expiring Old Archives and Sent Messages ... "
+s.mailboxes("INBOX/Archive", "Sent Items").each do |b|
+  print "  Deleting Messages in #{b} ... "
+  deletes = b.messages("headers.date.<" => Date.today << 12*10)
+  print "#{deletes.length} ... "
+  b.batch(:delete => deletes)
   puts "OK"
 end
 
@@ -75,3 +84,4 @@ puts "OK"
 print "Expunging and flushing all changes ... "
 s.mailboxes.each { |b| b.expunge }
 puts "OK"
+
