@@ -170,7 +170,10 @@ module Mail
 
       return @mailboxes["*"] = @connection.list("", "*").map { |mb| Mailbox.send(:new, mb.name, self) } if globs.empty?
 
-      globs.each { |g| @mailboxes[g] = @connection.list("", g).map { |mb| Mailbox.send(:new, mb.name, self) } }
+      globs.each do |g|
+        @mailboxes[g] = @connection.list("", g) || []
+        @mailboxes[g] = @mailboxes[g].map { |mb| Mailbox.send(:new, mb.name, self) }
+      end
 
       return @mailboxes[globs.first] if globs.length == 1
       @mailboxes.select { |k,v| globs.include? k }.map { |k,v| v }.flatten

@@ -342,10 +342,26 @@ module Mail
 
         if v == :all
           (1..unlocked_count(:messages)).each_slice(SLICE_SIZE) do |s|
-            set += @connection.fetch(s, ["UID"]).map { |m| m.attr["UID"] }
+            @connection.fetch(s, [
+                              "UID",
+                              "BODY.PEEK[HEADER.FIELDS (SUBJECT)]",
+                              "BODY.PEEK[HEADER.FIELDS (TO)]",
+                              "BODY.PEEK[HEADER.FIELDS (FROM)]",
+                              "FLAGS"
+            ]).each do |f|
+              after
+              set << Message.send(:new, f.seqno, self,
+                                  :uid => f.attr["UID"],
+                                  "headers.subject" => f.attr["BODY[HEADER.FIELDS (SUBJECT)]"],
+                                  "headers.to" => f.attr["BODY[HEADER.FIELDS (TO)]"],
+                                  "headers.from" => f.attr["BODY[HEADER.FIELDS (FROM)]"],
+                                  "flags" => f.attr["FLAGS"]
+                                 )
+              before
+            end
           end
         else
-          set = v.map { |m| m.uid }
+          set = v
         end
 
         return if set.empty?
@@ -354,19 +370,27 @@ module Mail
           # TODO Check the effects when :all is passed to copy or move ... Idempotent or duplicating?
           case k
           when :delete
-            @connection.uid_store(s, "+FLAGS", [:Deleted])
+            s.each do |m|
+              @connection.uid_store(m.uid, "+FLAGS", [:Deleted])
+            end
           when :read
-            @connection.uid_store(s, "+FLAGS", [:Seen])
+            s.each do |m|
+              @connection.uid_store(m.uid, "+FLAGS", [:Seen])
+            end
           when :copy
-            Set.new(s).classify { |m| m.mailbox }.each do |b,m|
+            Set.new(s).classify { |m| m.mailbox }.each do |b,s|
               b.select
-              @connection.uid_copy(m, @name)
+              s.each do |m|
+                @connection.uid_copy(m.uid, @name)
+              end
             end
           when :move
-            Set.new(s).classify { |m| m.mailbox }.each do |b,m|
+            Set.new(s).classify { |m| m.mailbox }.each do |b,s|
               b.select
-              @connection.uid_copy(m, @name)
-              @connection.uid_store(m, "+FLAGS", [:Deleted])
+              s.each do |m|
+                @connection.uid_copy(m.uid, @name)
+                @connection.uid_store(m.uid, "+FLAGS", [:Deleted])
+              end
             end
           end
         end

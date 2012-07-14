@@ -40,7 +40,7 @@ end
 #  puts "  Moving Messages from #{b}:"
 #  moves = b.messages("headers.subject.~" => /\[.*?\]/)
 #  Set.new(moves).classify { |m| m.headers(:subject).match(/\[(.*?)\]/)[1] }.each do |n, m|
-#    mailbox = s.mailboxes("INBOX/Mailing Lists/#{n}") || s.create_mailbox("INBOX/Mailing Lists/#{n}")
+#    mailbox = s.mailboxes("INBOX/Mailing Lists/#{n}").first || s.create_mailbox!("INBOX/Mailing Lists/#{n}")
 #    print "    Moving Messages to #{mailbox} ... #{m.length} ... "
 #    mailbox.batch(:move => m)
 #    puts "OK"
@@ -53,6 +53,16 @@ s.mailboxes("INBOX/Mailing Lists/%").each do |b|
   deletes = b.messages("headers.date.<" => Date.today - 7)
   print "#{deletes.length} ... "
   b.batch(:delete => deletes)
+  puts "OK"
+end
+
+print "Archiving Old INBOX Messages ... "
+s.mailboxes("INBOX").each do |b|
+  moves = b.messages("headers.date.<" => Date.today - (Date.today.leap? ? 366 : 365))
+  print "#{moves.length} ... "
+  archive = s.mailboxes("INBOX/Archive").first || s.create_mailbox!("INBOX/Archive")
+  archive.subscribe
+  archive.batch(:move => moves)
   puts "OK"
 end
 
