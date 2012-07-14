@@ -52,7 +52,7 @@
 #
 #   mail = Server.new(:imap, "example.com", "username", "password", :MECHANISM)
 #   mail.mailboxes("INBOX").each do |mb|
-#     mb.messages.each { |m| p m.headers(:subject) }
+#     mb.messages("headers.date.>" => Date.today - 7).each { |m| p m.headers(:subject) }
 #   end
 #
 module Mail
