@@ -35,17 +35,36 @@ s.mailboxes.each do |b|
   puts "OK"
 end
 
+# TODO Use when two-phase filtering works correctly ...
 #puts "Moving all messages with a mailing list designation (e.g. /\[.*?\]/) into an appropriate mailbox ..."
 #s.mailboxes.each do |b|
 #  puts "  Moving Messages from #{b}:"
 #  moves = b.messages("headers.subject.~" => /\[.*?\]/)
 #  Set.new(moves).classify { |m| m.headers(:subject).match(/\[(.*?)\]/)[1] }.each do |n, m|
 #    mailbox = s.mailboxes("INBOX/Mailing Lists/#{n}").first || s.create_mailbox!("INBOX/Mailing Lists/#{n}")
+#    mailbox.subscribe
 #    print "    Moving Messages to #{mailbox} ... #{m.length} ... "
 #    mailbox.batch(:move => m)
 #    puts "OK"
 #  end
 #end
+
+# TODO Remove when two-phase filtering works correctly ...
+# TODO Use headers.list-id.= when two pass filters work ...
+puts "Moving all messages with a mailing list designation (e.g. /\[.*?\]/) into an appropriate mailbox ... "
+s.mailboxes.each do |b|
+  puts "  Moving messages from #{b} ... "
+  moves = b.messages("headers.subject.=" => "[", "headers.subject.=" => "]", "headers.subject.<>" => b.name.split('/')[-1])
+  moves.select! { |m| m.headers(:subject).match(/\[.*?\]/) && m.mailbox.name.split('/')[-1] != m.headers(:subject).match(/\[.*?\]/)[1] }
+  Set.new(moves).classify { |m| m.headers(:subject).match(/\[(.*?)\]/)[1] }.each do |n, m|
+    mailbox = s.mailboxes("INBOX/Mailing Lists/#{n}").first || s.create_mailbox!("INBOX/Mailing Lists/#{n}")
+    mailbox.subscribe
+    next if b.name == mailbox.name
+    print "    Moving into #{mailbox} ... #{m.length} ... "
+    mailbox.batch(:move => m)
+    puts "OK"
+  end
+end
 
 puts "Deleting all mailing list messages older than seven days ..."
 s.mailboxes("INBOX/Mailing Lists/%").each do |b|
@@ -53,6 +72,14 @@ s.mailboxes("INBOX/Mailing Lists/%").each do |b|
   deletes = b.messages("headers.date.<" => Date.today - 7)
   print "#{deletes.length} ... "
   b.batch(:delete => deletes)
+  puts "OK"
+end
+
+puts "Deleting all empty mailing list mailboxes ..."
+s.mailboxes("INBOX/Mailing Lists/%").each do |b|
+  next if b.count(:messages) > 0
+  print "  Deleting #{b} ... "
+  b.delete!
   puts "OK"
 end
 
@@ -82,6 +109,6 @@ end
 puts "OK"
 
 print "Expunging and flushing all changes ... "
-s.mailboxes.each { |b| b.expunge }
+s.mailboxes!.each { |b| b.expunge }
 puts "OK"
 

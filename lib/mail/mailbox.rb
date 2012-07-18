@@ -284,13 +284,16 @@ module Mail
 
         fetch_set.each_slice(SLICE_SIZE) do |s|
           $stderr.puts "  Fetching: #{s}" if $DEBUG
-          @connection.fetch(s, [
-                                             "UID",
-                                             "BODY.PEEK[HEADER.FIELDS (SUBJECT)]",
-                                             "BODY.PEEK[HEADER.FIELDS (TO)]",
-                                             "BODY.PEEK[HEADER.FIELDS (FROM)]",
-                                             "FLAGS"
-          ]).each do |f|
+          fetched = @connection.fetch(s, [
+                                      "UID",
+                                      "BODY.PEEK[HEADER.FIELDS (SUBJECT)]",
+                                      "BODY.PEEK[HEADER.FIELDS (TO)]",
+                                      "BODY.PEEK[HEADER.FIELDS (FROM)]",
+                                      "FLAGS"
+          ])
+          $stderr.puts "  Fetched #{fetched}" if $DEBUG
+          next unless fetched # TODO WTF?
+          fetched.each do |f|
             @messages[key] ||= []
             after
             @messages[key] << Message.send(:new, f.seqno, self,
@@ -386,6 +389,7 @@ module Mail
             end
           when :move
             Set.new(s).classify { |m| m.mailbox }.each do |b,s|
+              next if b.name == @name
               b.select
               s.each do |m|
                 @connection.uid_copy(m.uid, @name)
@@ -533,21 +537,6 @@ module Mail
 
     def after
       @lock.unlock
-    end
-
-    def parse_regex(regex)
-      regex = regex..to_s.split(":", 2).last.chop
-
-      strings = {}
-      strings[:on] = []
-      strings[:off] = []
-
-      regex.split("").each_with_index do |c, i|
-        lookahead = lambda { regex[i +  1] unless i == regex.length }
-        lookbehind = lambda { regex[i - 1] unless i == 1 }
-      end
-      # TODO Review the dragon book to perform the translation desired.
-      strings
     end
   end
 

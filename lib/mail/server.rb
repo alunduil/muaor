@@ -194,7 +194,7 @@ module Mail
     #
     def create_mailbox!(name)
       @connection.create(name)
-      mailboxes(name).first
+      mailboxes!(name).first
     end
 
     # 
