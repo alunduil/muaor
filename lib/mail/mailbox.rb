@@ -37,7 +37,7 @@ module Mail
     def initialize(name, server)
       @server = server
       @connection = @server.send(:connection)
-      @lock = MailboxLock.instance.locks(@connection)
+      @lock = ConnectionLocks.instance[@connection]
       @name = name
     end
 
@@ -182,7 +182,6 @@ module Mail
                                              "FLAGS"
           ]).each do |f|
             @messages[key] ||= []
-            after
             @messages[key] << Message.send(:new, f.seqno, self,
                          :uid => f.attr["UID"],
                          "headers.subject" => f.attr["BODY[HEADER.FIELDS (SUBJECT)]"],
@@ -190,7 +189,6 @@ module Mail
                          "headers.from" => f.attr["BODY[HEADER.FIELDS (FROM)]"],
                          "flags" => f.attr["FLAGS"]
             )
-            before
           end
         end
         return @messages[key]
@@ -295,7 +293,6 @@ module Mail
           next unless fetched # TODO WTF?
           fetched.each do |f|
             @messages[key] ||= []
-            after
             @messages[key] << Message.send(:new, f.seqno, self,
                          :uid => f.attr["UID"],
                          "headers.subject" => f.attr["BODY[HEADER.FIELDS (SUBJECT)]"],
@@ -303,7 +300,6 @@ module Mail
                          "headers.from" => f.attr["BODY[HEADER.FIELDS (FROM)]"],
                          "flags" => f.attr["FLAGS"]
             )
-            before
           end
         end
       end
@@ -352,7 +348,6 @@ module Mail
                               "BODY.PEEK[HEADER.FIELDS (FROM)]",
                               "FLAGS"
             ]).each do |f|
-              after
               set << Message.send(:new, f.seqno, self,
                                   :uid => f.attr["UID"],
                                   "headers.subject" => f.attr["BODY[HEADER.FIELDS (SUBJECT)]"],
@@ -360,7 +355,6 @@ module Mail
                                   "headers.from" => f.attr["BODY[HEADER.FIELDS (FROM)]"],
                                   "flags" => f.attr["FLAGS"]
                                  )
-              before
             end
           end
         else
@@ -531,22 +525,22 @@ module Mail
     end
 
     def before
-      @lock.lock
+      @lock.lock(self)
       select
     end
 
     def after
-      @lock.unlock
+      @lock.unlock(self)
     end
   end
 
   private
 
-  class MailboxLock
+  class ConnectionLocks
     include Singleton
 
     def initialize
-      @mutexes = {}
+      @mailbox_locks = {}
     end
 
     #
@@ -563,10 +557,44 @@ module Mail
     # Get the particular mutex for the connection being used by the mailbox.
     #
     def locks(connection)
-      @mutexes[connection] ||= Mutex.new 
+      @mailbox_locks[connection] ||= MailboxLock.new
     end
+
+    alias [] locks
   end
 
+  class MailboxLock
+    def initialize
+      @mailbox = nil
+      @selectors = 0
+      @mutex = Mutex.new
+      @condition = ConditionVariable.new
+    end
+
+    def lock(mailbox)
+      @mutex.lock
+      @condition.wait(@mutex) until @mailbox.nil? or @mailbox == mailbox
+      @selectors += 1
+      @mailbox = mailbox if @mailbox.nil?
+      @mutex.unlock
+    end
+
+    def unlock(mailbox)
+      @mutex.lock
+      if @selectors < 1
+        warn "Spurious unlock detected in #{caller[0]}"
+        @mutex.unlock
+        return
+      else
+        @selectors -= 1
+        if @selectors < 1
+          @mailbox = nil
+          @condition.signal
+        end
+        @mutex.unlock
+      end
+    end
+  end
 end
 
 class String

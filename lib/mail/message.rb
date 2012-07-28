@@ -39,7 +39,7 @@ module Mail
     def initialize(msn, mailbox, kwargs = {})
       @mailbox = mailbox
       @connection = @mailbox.send(:connection)
-      @lock = MailboxLock.instance.locks(@connection)
+      @lock = ConnectionLocks.instance[@connection]
       @uid = @connection.fetch(msn, "UID").first.attr["UID"] unless @uid = kwargs.delete(:uid)
 
       @data = {}
@@ -289,12 +289,12 @@ module Mail
     private
 
     def before
-      @lock.lock
+      @lock.lock(@mailbox)
       @mailbox.select
     end
 
     def after
-      @lock.unlock
+      @lock.unlock(@mailbox)
     end
 
   end
